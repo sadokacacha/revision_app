@@ -3,17 +3,13 @@ import React from 'react'
 const Login = () => {
   return (
       
-
-
-
-
       <div className="login-container">
       <div className="image-section">
         <img src="../asstes/pic.jpg" alt="Eiffel Tower" />
       </div>
       <div className="login-section">
         <img src="../asstes/logo.png" alt="College de Paris" className="logo" />
-        <h2>Login</h2>
+        <h2>Logine</h2>
         <form>
           <input type="email" placeholder="Email" required />
           <input type="password" placeholder="Password" required />
