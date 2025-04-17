@@ -1,11 +1,8 @@
-import { useState } from 'react'
-
 import './App.css'
-import Login from '../components/Login'
+import Login from '../components/login/Login'
 import Menu from '../components/Menu/Menu'
 
 function App() {
-  const [count, setCount] = useState(0)
 
   return (
     <>
