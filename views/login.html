@@ -1,27 +1,45 @@
 <!DOCTYPE html>
-<html lang="fr">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link href="../styles/stylelogin.css" rel="stylesheet" />
-    <title>Login - Collège de Paris</title>
-  </head>
-  <body>
-    <div class="login-container">
-      <div class="image-section">
-        <img src="../asstes/pic.jpg" alt="Eiffel Tower" />
-      </div>
-      <div class="login-section">
-        <img src="../asstes/logo.png" alt="College de Paris" class="logo" />
-        <h2>Login</h2>
-        <form>
-          <input type="email" placeholder="Email" required />
-          <input type="password" placeholder="Password" required />
-          <button type="submit" class="btn primary">Sign in</button>
-          <button type="button" class="btn secondary">Connect With Alma</button>
-          
-        </form>
-      </div>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login  | College de Paris</title>
+    <link href="stylelogin.css"rel="stylesheet" />
+        <script src="login.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="login-panel">
+
+            <img src="pics/logo.png" alt="College de Paris" class="logo">
+
+            <h2>Login</h2>
+
+            <div class="input-group">
+                <label for="username"></label>
+                <input type="text" id="username" placeholder="Nom">
+
+                <i class="fas fa-user">
+                    <img src="pics/profile_icon.png" id="togglePassword">
+                </i> 
+                </i>
+            </div>
+
+
+
+
+            <div class="input-group">
+                <input type="password" id="password" placeholder="Mot De Passe ">
+                <i class="fas fa-lock">
+                    <img src="pics/eye_icon (1).png" id="togglePassword">
+                </i> 
+            </div>
+
+
+            <button class="btn" onclick="login()"> Entrer </button>
+        </div>
     </div>
-  </body>
+    <script src="../LOGIN/login.js"></script>
+</body>
 </html>
+
