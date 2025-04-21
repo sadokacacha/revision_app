@@ -1,18 +1,18 @@
-import './App.css'
-import Login from '../components/login/Login'
-import Menu from '../components/Menu/Menu'
+// App.jsx
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import Login from "./components/login/Login";
 
-function App() {
-
+const App = () => {
   return (
-    <>
+    <Routes>
+      <Route path="/login" element={<Login />} />
 
+      <Route path="/" element={<Navigate to="/login" />} />
 
-<Login />
-<Menu/>
+  
+    </Routes>
+  );
+};
 
-    </>
-  )
-}
-
-export default App
+export default App;
