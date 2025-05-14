@@ -1,0 +1,33 @@
+.btn-payment {
+  padding: 0.4rem 0.8rem;
+  background-color: #4caf50;
+  color: white;
+  font-weight: bold;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-payment:hover {
+  background-color: #388e3c;
+}
+
+.payment-box {
+  background: #f0f4f8;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.payment-form {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.payment-form input {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  flex: 1;
+}
