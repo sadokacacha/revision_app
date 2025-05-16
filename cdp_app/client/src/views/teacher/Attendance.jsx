@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { attendanceService } from '../../services/attendanceService';
-import { useStateContext } from '../../contexts/ContextsProvider';
+import React, { useState, useEffect } from 'react';
+import { useStateContext } from '../../contexts/ContextProvider';
+import './attendance.css';
 
-export default function Attendance() {
+const Attendance = () => {
   const [attendance, setAttendance] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user } = useStateContext();
@@ -13,8 +13,21 @@ export default function Attendance() {
 
   const loadTodayAttendance = async () => {
     try {
-      const data = await attendanceService.getTodayAttendance();
-      setAttendance(data);
+      // Temporarily using mock data until the service is implemented
+      const mockData = [
+        {
+          id: 1,
+          subject_name: "Mathematics",
+          classroom_name: "Class A",
+          start_time: "09:00",
+          end_time: "10:30",
+          students: [
+            { id: 1, name: "John Doe", status: "present" },
+            { id: 2, name: "Jane Smith", status: "absent" },
+          ]
+        }
+      ];
+      setAttendance(mockData);
     } catch (error) {
       console.error('Error loading attendance:', error);
     } finally {
@@ -24,11 +37,8 @@ export default function Attendance() {
 
   const markAttendance = async (studentId, status) => {
     try {
-      await attendanceService.markAttendance({
-        student_id: studentId,
-        status: status,
-        teacher_id: user.id
-      });
+      // Implement the actual service call here
+      console.log('Marking attendance:', { studentId, status, teacherId: user.id });
       await loadTodayAttendance();
     } catch (error) {
       console.error('Error marking attendance:', error);
@@ -40,42 +50,54 @@ export default function Attendance() {
   }
 
   return (
-    <div className="card animated fadeInDown">
-      <h1>Today's Attendance</h1>
-      <div className="attendance-container">
-        {attendance.length === 0 ? (
-          <p>No classes scheduled for today.</p>
-        ) : (
-          attendance.map((session) => (
-            <div key={session.id} className="attendance-session">
-              <h3>{session.subject_name}</h3>
-              <p>Class: {session.classroom_name}</p>
-              <p>Time: {session.start_time} - {session.end_time}</p>
-              <div className="students-list">
-                {session.students.map((student) => (
-                  <div key={student.id} className="student-attendance">
-                    <span>{student.name}</span>
-                    <div className="attendance-actions">
-                      <button
-                        onClick={() => markAttendance(student.id, 'present')}
-                        className={`btn ${student.status === 'present' ? 'btn-success' : ''}`}
-                      >
-                        Present
-                      </button>
-                      <button
-                        onClick={() => markAttendance(student.id, 'absent')}
-                        className={`btn ${student.status === 'absent' ? 'btn-danger' : ''}`}
-                      >
-                        Absent
-                      </button>
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Attendance Management</h1>
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="attendance-container">
+          {attendance.length === 0 ? (
+            <p>No classes scheduled for today.</p>
+          ) : (
+            attendance.map((session) => (
+              <div key={session.id} className="attendance-session p-4 mb-4 border rounded">
+                <h3 className="text-lg font-semibold mb-2">{session.subject_name}</h3>
+                <p className="text-gray-600 mb-1">Class: {session.classroom_name}</p>
+                <p className="text-gray-600 mb-4">Time: {session.start_time} - {session.end_time}</p>
+                <div className="students-list space-y-3">
+                  {session.students.map((student) => (
+                    <div key={student.id} className="student-attendance flex items-center justify-between bg-gray-50 p-3 rounded">
+                      <span className="font-medium">{student.name}</span>
+                      <div className="attendance-actions space-x-2">
+                        <button
+                          onClick={() => markAttendance(student.id, 'present')}
+                          className={`px-4 py-2 rounded ${
+                            student.status === 'present'
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-200 text-gray-700 hover:bg-green-100'
+                          }`}
+                        >
+                          Present
+                        </button>
+                        <button
+                          onClick={() => markAttendance(student.id, 'absent')}
+                          className={`px-4 py-2 rounded ${
+                            student.status === 'absent'
+                              ? 'bg-red-600 text-white'
+                              : 'bg-gray-200 text-gray-700 hover:bg-red-100'
+                          }`}
+                        >
+                          Absent
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
-} 
+};
+
+export default Attendance; 

@@ -1,8 +1,9 @@
+import React from 'react';
 import { useState, useEffect } from 'react';
 import { scheduleService } from '../../services/scheduleService';
-import { useStateContext } from '../../contexts/ContextsProvider';
+import { useStateContext } from '../../contexts/ContextProvider';
 
-export default function Schedule() {
+const Schedule = () => {
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user } = useStateContext();
@@ -27,22 +28,26 @@ export default function Schedule() {
   }
 
   return (
-    <div className="card animated fadeInDown">
-      <h1>My Schedule</h1>
-      <div className="schedule-container">
-        {schedule.length === 0 ? (
-          <p>No scheduled classes found.</p>
-        ) : (
-          schedule.map((item) => (
-            <div key={item.id} className="schedule-item">
-              <h3>{item.subject_name}</h3>
-              <p>Class: {item.classroom_name}</p>
-              <p>Time: {item.start_time} - {item.end_time}</p>
-              <p>Day: {item.day}</p>
-            </div>
-          ))
-        )}
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Class Schedule</h1>
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="schedule-container">
+          {schedule.length === 0 ? (
+            <p>No scheduled classes found.</p>
+          ) : (
+            schedule.map((item) => (
+              <div key={item.id} className="schedule-item">
+                <h3>{item.subject_name}</h3>
+                <p>Class: {item.classroom_name}</p>
+                <p>Time: {item.start_time} - {item.end_time}</p>
+                <p>Day: {item.day}</p>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
-} 
+};
+
+export default Schedule; 

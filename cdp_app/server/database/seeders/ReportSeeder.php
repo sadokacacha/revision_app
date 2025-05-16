@@ -13,9 +13,23 @@ class ReportSeeder extends Seeder
         $admin = User::whereHas('roles', fn ($q) => $q->where('name', 'admin'))->first();
 
         if ($admin) {
-            Report::factory()->count(10)->create([
-                'generated_by' => $admin->id,
-            ]);
+            // Create reports with hardcoded data instead of using factory
+            $reportTypes = ['sales', 'attendance', 'discipline'];
+            $contents = [
+                'This is a sales report for the month of May.',
+                'Attendance report for the first semester.',
+                'Student discipline report for the academic year.',
+                'Financial report for the second quarter.',
+                'Teacher performance evaluation summary.'
+            ];
+            
+            for ($i = 0; $i < 5; $i++) {
+                Report::create([
+                    'report_type' => $reportTypes[$i % 3],
+                    'content' => $contents[$i],
+                    'generated_by' => $admin->id,
+                ]);
+            }
         }
     }
 }
