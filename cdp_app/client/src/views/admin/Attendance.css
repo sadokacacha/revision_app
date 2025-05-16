@@ -1,4 +1,0 @@
-.attendance-table { width:100%; border-collapse: collapse; }
-.attendance-table th, .attendance-table td { border:1px solid #ddd; padding:8px; }
-.present-row { background: #e0f7e9; }    /* pale green */
-.absent-row  { background: #fde0e0; }    /* pale red   */

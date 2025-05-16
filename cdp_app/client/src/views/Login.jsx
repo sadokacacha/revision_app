@@ -1,80 +1,101 @@
-import React, { useState } from 'react';
-import { useEffect } from "react";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useStateContext } from "../contexts/ContextsProvider";
 
-import './login.css';
-import logo from '../assets/logo.png';
-import axiosClient from '../axios-client';
-import { useStateContext } from '../contexts/ContextsProvider';
-import { useNavigate } from 'react-router-dom';
-
-const Login = () => {
-  const { setUser, setToken } = useStateContext();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState(null);
+function Login() {
   const navigate = useNavigate();
+  const { login } = useStateContext();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const onSubmit = async (e) => {
+  const backgroundStyle = {
+    backgroundImage: "url('paris_night.jpg')",
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    height: "100vh",
+  };
+
+  const transparent = {
+    background: "rgba(255,255,255, 0.10)",
+    borderRadius: "16px",
+    backdropFilter: "blur(2px)",
+    WebkitBackdropFilter: "blur(2px)",
+    boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
+    border: "1px solid rgba(255, 255, 255, 0.07)",
+  };
+
+
+  const handleSubmit = async e => {
     e.preventDefault();
-    setErrors(null);
-  
     try {
-      const { data } = await axiosClient.post('/login', { email, password });
-      // success…
-      setToken(data.token);
-      setUser(data.user);
-      localStorage.setItem("USER_ROLE", data.user.role);
-      navigate(`/${data.user.role}/dashboard`);
+      const user = await login(email, password);
+      navigate(`/${user.role}/dashboard`);
     } catch (err) {
-      console.error("Login error:", err);
-      const status = err.response?.status;
-      if (status === 401) {
-        setErrors({ message: "Invalid email or password." });
-      } else if (status === 422) {
-        setErrors(err.response.data.errors || { message: err.response.data.message });
-      } else {
-        setErrors({ message: "Something went wrong. Try again later." });
-      }
+      setError('Invalid credentials');
     }
   };
-  useEffect(() => {
-    const token = localStorage.getItem("ACCESS_TOKEN");
-    const role = localStorage.getItem("USER_ROLE");
-  
-    if (token && role) {
-      navigate(`/${role}/dashboard`);
-    }
-  }, []);
 
   return (
-    <div className="login-container">
-      <div className="login-section">
-        <img src={logo} alt="College de Paris" className="logo" />
-        <h2>Login</h2>
-
-        {errors && <div className="error">{JSON.stringify(errors)}</div>}
-
-        <form onSubmit={onSubmit}>
-          <input
-            type="email"
-            placeholder="Email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+    <div style={backgroundStyle} className="d-flex align-items-center justify-content-left">
+      <div style={transparent} className="h-100 p-5 d-flex align-items-center justify-content-center">
+        <div>
+          <img
+            src="cdp.png"
+            alt="Logo"
+            className="img-fluid mb-4"
+            style={{ width: "200px" }}
           />
-          <input
-            type="password"
-            placeholder="Password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <button type="submit" className="btn primary">Sign in</button>
-          <button type="button" className="btn secondary">Connect With Alma</button>
-        </form>
+          <form onSubmit={handleSubmit} className="text-center">
+            {error && (
+              <div className="alert alert-danger" role="alert">
+                {error}
+              </div>
+            )}
+            <div className="mb-3">
+              <input
+                type="email"
+                className="login-section p-2 m-1"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="mb-3">
+              <input
+                type="password"
+                className="login-section p-2"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className="mt-5 d-grid gap-3">
+              <button
+                id="color"
+                type="submit"
+                className="btn p2 login-sectionx"
+                disabled={loading}
+              >
+                {loading ? "Logging in..." : "Login"}
+              </button>
+              <button
+                id="btn-secondary"
+                type="button"
+                className="btn p-2"
+                disabled={loading}
+              >
+                Connect With Alma
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
-};
+}
 
 export default Login;

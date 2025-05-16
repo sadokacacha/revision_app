@@ -1,50 +1,42 @@
-import React  from 'react'
-import { useState , useContext  , createContext } from 'react'
+// src/contexts/ContextsProvider.jsx
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import axiosClient from '../axios-client';
 
+const StateContext = createContext({});
 
-const StateContext = createContext({
+export const ContextsProvider = ({ children }) => {
+  const [user, setUser]   = useState(JSON.parse(localStorage.getItem('USER_DATA')));
+  const [token, setToken] = useState(localStorage.getItem('ACCESS_TOKEN'));
 
-    user: null,
-    token: null,
-    setUser: () => {},
-    setToken: () => {},
+  // keep localStorage in sync
+  useEffect(() => {
+    if (user)  localStorage.setItem('USER_DATA', JSON.stringify(user));
+    else       localStorage.removeItem('USER_DATA');
+  }, [user]);
 
+  useEffect(() => {
+    if (token) setToken(token);
+    else       localStorage.removeItem('ACCESS_TOKEN');
+  }, [token]);
 
+const login = async (email, password) => {
+  const { user, token } = await axiosClient.post('/login', { email, password });
+  setUser(user);
+  localStorage.setItem('ACCESS_TOKEN', token);
+  return user;
+};
 
+  const logout = async () => {
+    await axiosClient.post('/logout');
+    setUser(null);
+    setToken(null);
+  };
 
-})
-
-export const ContextsProvider = ({children}) => {
-    const [user, setUser] = useState({
-        
-    })
-    const [token, _setToken] = useState(localStorage.getItem('ACCESS_TOKEN') || null)
-
-
-    
-
-    const setToken = (token) => {
-        _setToken(token)
-        if (token) {
-            localStorage.setItem('ACCESS_TOKEN', token)
-    } else {
-            localStorage.removeItem('ACCESS_TOKEN')
-        }
-}
-
-return (
-    <StateContext.Provider value={{
-        user,
-        token ,
-        setUser , 
-        setToken , 
-    }}>
-        {children}
+  return (
+    <StateContext.Provider value={{ user, login, logout }}>
+      {children}
     </StateContext.Provider>
+  );
+};
 
-)
-
-
-}
-
-export const useStateContext = () => useContext(StateContext)
+export const useStateContext = () => useContext(StateContext);

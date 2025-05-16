@@ -1,68 +1,105 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useStateContext } from './contexts/ContextsProvider';
 import ProtectedRoute from './contexts/ProtectedRoute';
+import { csrfAxios } from './axios-client';
 
-import Login from './views/Login';
+// Layouts
 import DashboardLayout from './components/DashboardLayout';
-import AdminDashboard   from './views/admin/AdminDashboard';
-import TeacherDashboard from './views/teacher/TeacherDashboard';
-import StudentDashboard from './views/student/StudentDashboard';
 
-import UserManagement from './views/admin/UserManagement';
-import AddUser        from './views/admin/AddUser';
-import ViewUser       from './views/admin/ViewUser';
-import SchoolSchedule from './views/admin/SchoolSchedule';
-import ClassroomList  from './views/admin/ClassroomList';
-import ClassroomForm  from './views/admin/ClassroomForm';
-import SubjectList    from './views/admin/SubjectList';
-import SubjectForm    from './views/admin/SubjectForm';
-import Attendance     from './views/admin/Attendance';
+// Auth Views
+import Login from './views/Login';
+
+// Admin Views
+import AdminDashboard from './views/admin/AdminDashboard';
+import UserManagement from './views/admin/userManagment/Management';
+import UserDetails from './views/admin/userManagment/userDetails';
+import SchoolSchedule from './views/admin/shedule/SchoolSchedule';
+import ClassroomModules from './views/admin/addClassroom/Modules';
+import Attendance from './views/admin/userManagment/Attendance';
+
+// Teacher Views
+import TeacherDashboard from './views/teacher/TeacherDashboard';
+import TeacherSchedule from './views/teacher/Schedule';
+import TeacherAttendance from './views/teacher/Attendance';
+import TeacherPayments from './views/teacher/Payments';
+
+// Student Views
+import StudentDashboard from './views/student/StudentDashboard';
+import StudentSchedule from './views/student/Schedule';
+import StudentAttendance from './views/student/Attendance';
+import StudentPayments from './views/student/Payments';
+import { useEffect } from 'react';
 
 export default function App() {
+  const { user } = useStateContext();
+
+  useEffect(() => {
+    csrfAxios.get('/sanctum/csrf-cookie').catch(console.error);
+  }, []);
+
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
+      {/* Public Routes */}
+      <Route path="/login" element={
+        user ? <Navigate to={`/${user.role}/dashboard`} /> : <Login />
+      } />
 
+      {/* Admin Routes */}
       <Route path="/admin" element={
         <ProtectedRoute role="admin">
           <DashboardLayout />
         </ProtectedRoute>
       }>
+        <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
-
-        <Route path="users"       element={<UserManagement />} />
-        <Route path="users/new"   element={<AddUser />} />
-        <Route path="users/:id"   element={<ViewUser />} />
-
-        <Route path="schedule"    element={<SchoolSchedule />} />
-
-        <Route path="classrooms"  element={<ClassroomList />} />
-        <Route path="classrooms/new" element={<ClassroomForm />} />
-        <Route path="classrooms/:id" element={<ClassroomForm edit />} />
-
-        <Route path="subjects"    element={<SubjectList />} />
-        <Route path="subjects/new" element={<SubjectForm />} />
-        <Route path="subjects/:id" element={<SubjectForm edit />} />
-
-        <Route path="attendance"  element={<Attendance />} />
+        
+        {/* User Management */}
+        <Route path="users" element={<UserManagement />} />
+        <Route path="users/:id" element={<UserDetails />} />
+        
+        {/* Schedule Management */}
+        <Route path="schedule" element={<SchoolSchedule />} />
+        
+        {/* Classroom Management */}
+        <Route path="classrooms" element={<ClassroomModules />} />
+        
+        {/* Attendance Management */}
+        <Route path="attendance" element={<Attendance />} />
       </Route>
 
+      {/* Teacher Routes */}
       <Route path="/teacher" element={
         <ProtectedRoute role="teacher">
           <DashboardLayout />
         </ProtectedRoute>
       }>
+        <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<TeacherDashboard />} />
+        <Route path="schedule" element={<TeacherSchedule />} />
+        <Route path="attendance" element={<TeacherAttendance />} />
+        <Route path="payments" element={<TeacherPayments />} />
       </Route>
 
+      {/* Student Routes */}
       <Route path="/student" element={
         <ProtectedRoute role="student">
           <DashboardLayout />
         </ProtectedRoute>
       }>
+        <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<StudentDashboard />} />
+        <Route path="schedule" element={<StudentSchedule />} />
+        <Route path="attendance" element={<StudentAttendance />} />
+        <Route path="payments" element={<StudentPayments />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/login" />} />
+      {/* Root Redirect */}
+      <Route path="/" element={
+        user ? <Navigate to={`/${user.role}/dashboard`} /> : <Navigate to="/login" />
+      } />
+
+      {/* Catch All */}
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }

@@ -1,7 +1,6 @@
 // src/components/Attendance.jsx
 import { useEffect, useState } from 'react';
-import axiosClient from '../../axios-client';
-import './Attendance.css';
+import axiosClient from '../../../axios-client';
 
 export default function Attendance({ range = 'today' }) {
   const [schedule, setSchedule]       = useState([]);

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import axiosClient from "../../axios-client";
-import "./SchoolSchedule.css";
+import axiosClient from "../../../axios-client";
 
 export default function SchoolSchedule() {
   const [schedule, setSchedule] = useState([]);
