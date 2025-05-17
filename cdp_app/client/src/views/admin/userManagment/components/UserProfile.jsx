@@ -1,9 +1,18 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "react-bootstrap";
 
 const UserProfile = ({ user, onEditClick, onDeleteClick }) => {
-  // Default avatar or user's profile picture
-  const avatarUrl = user.avatar || "/default-avatar.png";
+  // Store avatar URL in state to prevent unnecessary re-renders
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar || "/default-avatar.png");
+  
+  // Update avatar URL only when user ID changes
+  useEffect(() => {
+    if (user && user.avatar) {
+      setAvatarUrl(user.avatar);
+    } else {
+      setAvatarUrl("/default-avatar.png");
+    }
+  }, [user?.id, user?.avatar]);
   
   // Get payment info for students
   const getPaymentInfo = () => {
@@ -40,6 +49,7 @@ const UserProfile = ({ user, onEditClick, onDeleteClick }) => {
     <div className="card p-3 shadow-sm">
       <div className="text-center">
         <img
+          key={user.id} // Add key to force re-render when user ID changes
           src={avatarUrl}
           alt={`${user.name}'s profile`}
           className="rounded-circle me-2"
@@ -72,14 +82,14 @@ const UserProfile = ({ user, onEditClick, onDeleteClick }) => {
         <strong>Role:</strong> {user.role}
       </p>
       <p>
-        <strong>Phone:</strong> {user.phone}
+        <strong>Phone:</strong> {user.phone || 'Not provided'}
       </p>
       <p>
-        <strong>Address:</strong> {user.address}
+        <strong>Address:</strong> {user.address || 'Not provided'}
       </p>
       {user.role === "teacher" && (
         <p>
-          <strong>Rate per Hour:</strong> ${user.ratePerHour}
+          <strong>Rate per Hour:</strong> ${user.ratePerHour || '0'}
         </p>
       )}
       {user.role === "student" && paymentInfo && (

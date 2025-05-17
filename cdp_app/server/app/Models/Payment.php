@@ -15,7 +15,11 @@ class Payment extends Model
     'method',    // 'cash', 'check', 'bank'
     'amount',
     'date',
-    'status'
+    'status',
+    'reference_id',
+    'description',
+    'payment_style',
+    'period'
 ];
 
     public function user()

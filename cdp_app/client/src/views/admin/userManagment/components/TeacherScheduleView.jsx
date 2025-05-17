@@ -5,14 +5,26 @@ import axiosClient from "../../../../axios-client";
 const TeacherScheduleView = ({ teacherId }) => {
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   useEffect(() => {
     const fetchSchedule = async () => {
+      if (!teacherId) return;
+      
+      setLoading(true);
+      setError(null);
+      
       try {
         const response = await axiosClient.get(`/teachers/${teacherId}/schedule`);
-        setSchedule(response.data);
+        if (Array.isArray(response.data)) {
+          setSchedule(response.data);
+        } else {
+          console.warn('Invalid schedule data format:', response.data);
+          setSchedule([]);
+        }
       } catch (error) {
         console.error('Error fetching teacher schedule:', error);
+        setError('Failed to load schedule data');
       } finally {
         setLoading(false);
       }
@@ -33,9 +45,17 @@ const TeacherScheduleView = ({ teacherId }) => {
     );
   }
   
+  if (error) {
+    return (
+      <div className="alert alert-danger" role="alert">
+        {error}
+      </div>
+    );
+  }
+  
   return (
     <div className="schedule-container">
-      {schedule.length === 0 ? (
+      {(!Array.isArray(schedule) || schedule.length === 0) ? (
         <div className="text-center text-muted py-3">
           No schedule information available
         </div>
@@ -54,8 +74,8 @@ const TeacherScheduleView = ({ teacherId }) => {
               <tr key={index}>
                 <td>{s.day}</td>
                 <td>{s.start_time} - {s.end_time}</td>
-                <td>{s.subject?.name}</td>
-                <td>{s.classroom?.name}</td>
+                <td>{s.subject?.name || 'Not specified'}</td>
+                <td>{s.classroom?.name || 'Not specified'}</td>
               </tr>
             ))}
           </tbody>

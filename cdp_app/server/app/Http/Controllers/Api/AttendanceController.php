@@ -8,6 +8,7 @@ use App\Models\Payment;
 use Illuminate\Http\Request;
 use App\Models\Schedule;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 
 
 class AttendanceController extends Controller
@@ -74,67 +75,80 @@ class AttendanceController extends Controller
 
 public function mark(Request $request)
 {
-    $data = $request->validate([
-        'schedule_id' => 'required|exists:schedules,id',
-        'teacher_id'  => 'required|exists:teachers,id',
-        'date'        => 'required|date',
-        'status'      => 'required|in:present,absent',
-        'hours'       => 'required_if:status,present|numeric|min:0',
-    ]);
-
-    // Get the schedule to access related data
-    $schedule = Schedule::with('teacher.user', 'subject', 'classroom')
-        ->findOrFail($data['schedule_id']);
-    
-    // Get the teacher info to calculate payment
-    $teacher = $schedule->teacher;
-    
-    // Build the payload for updateOrCreate
-    $payload = [
-        'present' => $data['status'] === 'present',
-        'hours'   => $data['status'] === 'present' 
-                     ? ($data['hours'] ?? 0) 
-                     : 0,
-    ];
-
-    // Upsert the attendance record
-    $attendance = Attendance::updateOrCreate(
-        [
-          'schedule_id' => $data['schedule_id'],
-          'teacher_id'  => $data['teacher_id'],
-          'date'        => $data['date'],
-        ],
-        $payload
-    );
-    
-    // If teacher is present, create or update payment record
-    if ($data['status'] === 'present' && $data['hours'] > 0) {
-        // Calculate payment amount
-        $hourlyRate = $teacher->hourly_rate ?? 0;
-        $paymentAmount = $hourlyRate * $data['hours'];
+    try {
+        Log::info('Attendance mark request received:', $request->all());
         
-        // Create payment record for the teacher
-        Payment::updateOrCreate(
-            [
-                'user_id' => $teacher->user_id,
-                'date' => $data['date'],
-                'type' => 'teacher_attendance',
-                'reference_id' => $attendance->id
-            ],
-            [
-                'amount' => $paymentAmount,
-                'method' => $teacher->payment_method ?? 'bank',
-                'status' => 'pending',
-                'description' => "Payment for {$schedule->subject->name} class on {$data['date']}"
-            ]
-        );
+        $data = $request->validate([
+            'schedule_id' => 'required|exists:schedules,id',
+            'teacher_id'  => 'required|exists:teachers,id',
+            'date'        => 'required|date',
+            'status'      => 'required|in:present,absent',
+            'hours'       => 'required_if:status,present|numeric|min:0',
+        ]);
+
+        // Get the schedule to access related data
+        $schedule = Schedule::findOrFail($data['schedule_id']);
+        Log::info('Schedule found:', ['schedule_id' => $schedule->id]);
         
-        // Add payment info to response
-        $attendance->payment_amount = $paymentAmount;
-        $attendance->hourly_rate = $hourlyRate;
+        // Get the teacher info to calculate payment
+        $teacher = $schedule->teacher;
+        Log::info('Teacher found:', ['teacher_id' => $teacher->id]);
+        
+        // Build the payload for updateOrCreate - match fields to fillable array
+        $payload = [
+            'schedule_id' => $data['schedule_id'],
+            'teacher_id'  => $data['teacher_id'],
+            'date'        => $data['date'],
+            'present'     => $data['status'] === 'present',
+            'hours'       => $data['status'] === 'present' ? ($data['hours'] ?? 0) : 0,
+        ];
+        
+        Log::info('Creating attendance with payload:', $payload);
+
+        try {
+            // Upsert the attendance record
+            $attendance = Attendance::updateOrCreate(
+                [
+                  'schedule_id' => $data['schedule_id'],
+                  'date'        => $data['date'],
+                ],
+                $payload
+            );
+            
+            Log::info('Attendance record created/updated:', ['id' => $attendance->id]);
+        } catch (\Exception $e) {
+            Log::error('Failed to create/update attendance:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+        
+        // Skip payment creation for now to isolate the issue
+        return response()->json([
+            'message' => 'Attendance marked successfully',
+            'attendance' => $attendance
+        ]);
+    
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        Log::warning('Validation failed for attendance marking:', [
+            'errors' => $e->errors()
+        ]);
+        return response()->json([
+            'message' => 'Validation failed',
+            'errors' => $e->errors()
+        ], 422);
+    } catch (\Exception $e) {
+        Log::error('Attendance marking error:', [
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return response()->json([
+            'message' => 'Failed to mark attendance',
+            'error' => $e->getMessage()
+        ], 500);
     }
-
-    return response()->json($attendance);
 }
 
 public function index(Request $request)

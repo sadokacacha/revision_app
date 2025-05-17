@@ -38,7 +38,11 @@ Route::middleware('auth:api')->group(function () {
     // ADMIN-ONLY Routes
     Route::middleware('role:admin')->group(function () {
         Route::apiResource('users', UserController::class);
+        Route::get('/users/{id}/payments', [UserController::class, 'payments']);
+        Route::post('/users/{id}/payments', [PaymentController::class, 'store']);
         Route::apiResource('teachers', TeacherController::class);
+        Route::get('/teachers/{id}/schedule', [TeacherController::class, 'schedule']);
+        Route::get('/teachers/{id}/hours-by-subject', [TeacherController::class, 'hoursBySubject']);
         Route::apiResource('classrooms', ClassroomController::class);
         Route::apiResource('subjects', SubjectController::class);
 
@@ -68,6 +72,7 @@ Route::middleware('auth:api')->group(function () {
 
         // Payments Management
         Route::prefix('payments')->group(function () {
+            Route::get('/', [PaymentController::class, 'index']);
             Route::post('/', [PaymentController::class, 'store']);
             Route::get('/user/{id}', [PaymentController::class, 'history']);
             Route::put('/{id}', [PaymentController::class, 'update']);

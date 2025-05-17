@@ -22,7 +22,7 @@ export default function UserDetails() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   
-  // Fetch user data when component mounts
+  // Fetch user data when component mounts or when id changes
   useEffect(() => {
     const fetchUserData = async () => {
       setLoading(true);
@@ -31,11 +31,28 @@ export default function UserDetails() {
       try {
         // Make API call to get user details
         const response = await axiosClient.get(`/users/${id}`);
-        setUser(response.data);
         
-        // Fetch user payments
-        const paymentsResponse = await axiosClient.get(`/users/${id}/payments`);
-        setPayments(paymentsResponse.data || []);
+        // Check if we got valid user data
+        if (response.data && response.data.id) {
+          setUser(response.data);
+          
+          // Fetch user payments
+          try {
+            const paymentsResponse = await axiosClient.get(`/users/${id}/payments`);
+            if (Array.isArray(paymentsResponse.data)) {
+              setPayments(paymentsResponse.data);
+            } else {
+              console.warn('Invalid payments data format:', paymentsResponse.data);
+              setPayments([]);
+            }
+          } catch (paymentError) {
+            console.error('Error fetching payment data:', paymentError);
+            setPayments([]);
+          }
+        } else {
+          console.error('Invalid user data received:', response.data);
+          setError('Invalid user data received from server.');
+        }
       } catch (error) {
         console.error('Error fetching user data:', error);
         setError('Failed to load user data. Please try again.');
@@ -44,17 +61,22 @@ export default function UserDetails() {
       }
     };
     
-    fetchUserData();
+    if (id) {
+      fetchUserData();
+    }
   }, [id]);
   
   // Handle user update
   const handleUserUpdated = (updatedUser) => {
+    // Create a new object to ensure React detects the change
     setUser(prev => ({ ...prev, ...updatedUser }));
   };
   
   // Handle payment added
   const handlePaymentAdded = (newPayment) => {
-    setPayments(prev => [...prev, newPayment]);
+    if (newPayment) {
+      setPayments(prev => Array.isArray(prev) ? [...prev, newPayment] : [newPayment]);
+    }
   };
   
   // Handle user deletion
@@ -77,6 +99,11 @@ export default function UserDetails() {
     return (
       <div className="alert alert-danger my-5" role="alert">
         {error || 'User not found'}
+        <div className="mt-3">
+          <Link to="/admin/users" className="btn btn-primary">
+            Back to Users List
+          </Link>
+        </div>
       </div>
     );
   }
@@ -151,7 +178,7 @@ export default function UserDetails() {
                 
                 {/* Payment History Tab */}
                 <Tab eventKey="payments" title="Payment History">
-                  {payments.length > 0 ? (
+                  {Array.isArray(payments) && payments.length > 0 ? (
                     <PaymentsList payments={payments} user={user} />
                   ) : (
                     <div className="text-center py-3">
@@ -185,6 +212,7 @@ export default function UserDetails() {
       
       {/* Edit User Modal */}
       <EditUserModal
+        key={`edit-user-${user.id}`}
         showModal={showEditModal}
         setShowModal={setShowEditModal}
         user={user}

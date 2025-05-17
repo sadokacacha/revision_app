@@ -51,7 +51,9 @@ const StudentManagement = ({
   // Filter users to show only students
   const studentUsers = users.filter(user => user.role === 'student');
   
-  const filteredPayments = payments.filter(p => 
+  // Ensure payments is always an array before filtering
+  const paymentsArray = Array.isArray(payments) ? payments : [];
+  const filteredPayments = paymentsArray.filter(p => 
     (activeTab === "all" ? true : p.status === activeTab) && p.role === "student"
   );
   
@@ -80,7 +82,7 @@ const StudentManagement = ({
         case 'semester':
           paymentData.amount = student.semesterFee || 1500;
           // Check if this is first or second semester payment
-          semesterPayments = payments.filter(p => 
+          semesterPayments = paymentsArray.filter(p => 
             p.userId === studentId && p.paymentStyle === 'semester'
           ).length;
           paymentData.period = `Semester ${semesterPayments + 1}/2`;
@@ -95,7 +97,7 @@ const StudentManagement = ({
         default:
           paymentData.amount = student.monthlyFee || 300;
           // Check which month payment this is
-          monthlyPayments = payments.filter(p => 
+          monthlyPayments = paymentsArray.filter(p => 
             p.userId === studentId && p.paymentStyle === 'monthly'
           ).length;
           totalMonths = student.paymentPeriod || 9;
@@ -110,14 +112,14 @@ const StudentManagement = ({
       const response = await axiosClient.post(`/users/${studentId}/payments`, paymentData);
       
       // Add the new payment to the list (would normally happen via a re-fetch)
-      const updatedPayments = [...payments, response.data];
+      const updatedPayments = [...paymentsArray, response.data];
       
       alert('Payment recorded successfully!');
       return updatedPayments;
     } catch (error) {
       console.error('Error recording payment:', error);
       alert('Failed to record payment.');
-      return payments;
+      return paymentsArray;
     }
   };
 

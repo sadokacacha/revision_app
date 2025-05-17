@@ -9,14 +9,23 @@ const TodaysTeacherList = () => {
   const [todaysSchedule, setTodaysSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
   const [attendanceStatus, setAttendanceStatus] = useState({});
+  const [todayDate, setTodayDate] = useState(new Date().toISOString().split('T')[0]); // Today's date in YYYY-MM-DD format
   const navigate = useNavigate();
   
   useEffect(() => {
     const fetchTodaysSchedule = async () => {
       try {
         // Get today's schedule
-        const response = await axiosClient.get('/emploi/today');
-        setTodaysSchedule(Array.isArray(response.data) ? response.data : response.data.schedules || []);
+        const response = await axiosClient.get('/schedules/today');
+        
+        // Store today's date from the response if available
+        if (response.data && response.data.date) {
+          setTodayDate(response.data.date);
+        }
+        
+        // Extract schedules from response
+        const schedules = Array.isArray(response.data) ? response.data : response.data.schedules || [];
+        setTodaysSchedule(schedules);
       } catch (error) {
         console.error('Error fetching today\'s schedule:', error);
         // Use mock data when API fails with 500 error
@@ -26,7 +35,6 @@ const TodaysTeacherList = () => {
             teacher: { id: 1, name: 'John Smith' },
             classroom: { name: 'Class A' },
             subject: { name: 'Mathematics' },
-            date: new Date().toISOString().split('T')[0],
             start_time: '09:00',
             end_time: '10:30'
           },
@@ -35,7 +43,6 @@ const TodaysTeacherList = () => {
             teacher: { id: 2, name: 'Sarah Johnson' },
             classroom: { name: 'Class B' },
             subject: { name: 'Physics' },
-            date: new Date().toISOString().split('T')[0],
             start_time: '11:00',
             end_time: '12:30'
           }
@@ -71,17 +78,41 @@ const TodaysTeacherList = () => {
       axiosClient.post('/attendance/mark', {
         schedule_id: schedule.id,
         teacher_id: schedule.teacher.id,
-        date: schedule.date,
+        date: todayDate, // Use the stored todayDate
         status,
         hours
       })
+      .then(response => {
+        console.log('Attendance marked successfully:', response.data);
+      })
       .catch(error => {
         console.error('Error marking attendance:', error);
-        alert('API error. Attendance marked in UI only.');
+        
+        // Display specific validation errors if available
+        if (error.response && error.response.data && error.response.data.errors) {
+          const errorMessages = Object.values(error.response.data.errors).flat().join('\n');
+          alert(`Validation errors:\n${errorMessages}`);
+        } else {
+          alert('API error. Attendance marked in UI only.');
+        }
+        
+        // Revert the UI state since the API call failed
+        setAttendanceStatus(prev => {
+          const newState = {...prev};
+          delete newState[schedule.id];
+          return newState;
+        });
       });
     } catch (error) {
       console.error('Error marking attendance:', error);
       alert('Failed to mark attendance');
+      
+      // Revert the UI state
+      setAttendanceStatus(prev => {
+        const newState = {...prev};
+        delete newState[schedule.id];
+        return newState;
+      });
     }
   };
   
@@ -102,7 +133,7 @@ const TodaysTeacherList = () => {
   
   return (
     <div className="today-teachers">
-      <h5 className="mb-3">Teachers Teaching Today</h5>
+      <h5 className="mb-3">Teachers Teaching Today ({todayDate})</h5>
       
       {todaysSchedule.length === 0 ? (
         <div className="alert alert-info">

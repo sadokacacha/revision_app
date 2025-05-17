@@ -51,7 +51,7 @@ class UserController extends Controller
         'role'  => $role,
     ];
 
-    // If it’s a teacher, build their detailed breakdown
+    // If it's a teacher, build their detailed breakdown
     if ($role === 'teacher') {
         $teacher    = $user->teacher;
         $hourlyRate = $teacher->hourly_rate;
@@ -98,7 +98,7 @@ class UserController extends Controller
             ];
         }
 
-        // pull in any manual payments they’ve received
+        // pull in any manual payments they've received
         $payments = Payment::where('user_id', $user->id)
                             ->orderBy('date','desc')
                             ->get(['id','amount','status','date']);
@@ -214,6 +214,23 @@ class UserController extends Controller
             });
     
         return response()->json($schedule);
+    }
+
+    public function payments($id)
+    {
+        try {
+            $user = User::findOrFail($id);
+            $payments = Payment::where('user_id', $user->id)
+                ->orderBy('date', 'desc')
+                ->get();
+            
+            return response()->json($payments);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to fetch payments.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
 }
