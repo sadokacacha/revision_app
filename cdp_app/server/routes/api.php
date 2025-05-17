@@ -52,6 +52,7 @@ Route::middleware('auth:api')->group(function () {
             Route::get('/week', [ScheduleController::class, 'week']);
             Route::get('/month', [ScheduleController::class, 'month']);
             Route::get('/upcoming', [ScheduleController::class, 'upcomingWeek']);
+            Route::get('/period', [ScheduleController::class, 'byPeriod']);
             Route::get('/classroom/{id}', [ScheduleController::class, 'getByClassroom']);
             Route::get('/teacher/{id}', [ScheduleController::class, 'getByTeacher']);
         });

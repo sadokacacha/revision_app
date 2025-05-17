@@ -8,31 +8,95 @@ use App\Models\User;
 use App\Models\Teacher;
 use App\Models\Attendance;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class PaymentController extends Controller
 {
+    // 📝 Get all payments with pagination
+    public function index(Request $request)
+    {
+        try {
+            $query = Payment::with('user');
+            
+            // Filter by type if provided
+            if ($request->has('type')) {
+                $query->where('type', $request->type);
+            }
+            
+            // Filter by user if provided
+            if ($request->has('user_id')) {
+                $query->where('user_id', $request->user_id);
+            }
+            
+            // Filter by status if provided
+            if ($request->has('status')) {
+                $query->where('status', $request->status);
+            }
+            
+            $payments = $query->latest()->paginate(15);
+            
+            return response()->json($payments);
+        } catch (\Exception $e) {
+            Log::error('Error in payments index: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to retrieve payments.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     // 🧾 Store a payment (for teacher or student)
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'type' => 'required|in:student,teacher',
-            'method' => 'required|in:cash,check,bank',
-            'amount' => 'required|numeric|min:0',
-            'date' => 'required|date',
-            'status' => 'nullable|in:pending,paid',
-        ]);
-
-        $payment = Payment::create([
-            ...$data,
-            'status' => $data['status'] ?? 'pending',
-        ]);
-
-        return response()->json([
-            'message' => ucfirst($data['type']) . ' payment recorded.',
-            'data' => $payment,
-        ], 201);
+        try {
+            $data = $request->validate([
+                'userId' => 'required|exists:users,id',
+                'method' => 'required|in:cash,check,bank',
+                'amount' => 'required|numeric|min:0',
+                'date' => 'required|date',
+                'status' => 'nullable|in:pending,paid',
+                'period' => 'nullable|string',
+                'paymentStyle' => 'nullable|string'
+            ]);
+            
+            // Get user to determine type
+            $user = User::findOrFail($data['userId']);
+            $type = strtolower($user->role);
+            
+            if (!in_array($type, ['student', 'teacher'])) {
+                return response()->json([
+                    'message' => 'Payment can only be created for student or teacher.'
+                ], 422);
+            }
+            
+            $payment = Payment::create([
+                'user_id' => $data['userId'],
+                'type' => $type,
+                'method' => $data['method'],
+                'amount' => $data['amount'],
+                'date' => $data['date'],
+                'status' => $data['status'] ?? 'paid',
+                'period' => $data['period'] ?? null,
+                'payment_style' => $data['paymentStyle'] ?? null
+            ]);
+            
+            return response()->json([
+                'message' => ucfirst($type) . ' payment recorded.',
+                'data' => $payment,
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error creating payment: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to create payment.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     // 📜 Get payment history for a user (student or teacher)

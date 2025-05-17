@@ -1,265 +1,203 @@
-import React, { useState } from "react";
-import { Button, Modal, Form } from "react-bootstrap";
+import React, { useState, useEffect } from "react";
+import { Button, Modal, Form, Card, Table, Row, Col, Badge, Tabs, Tab } from "react-bootstrap";
+import { useParams, Link } from "react-router-dom";
+import axiosClient from "../../../axios-client";
 
-function UserDetails({ user }) {
+// Import components
+import TeacherScheduleView from "./components/TeacherScheduleView";
+import TeacherHoursBySubject from "./components/TeacherHoursBySubject";
+import PaymentFormModal from "./components/PaymentFormModal";
+import PaymentsList from "./components/PaymentsList";
+import UserProfile from "./components/UserProfile";
+import EditUserModal from "./components/EditUserModal";
+import DeleteUserModal from "./components/DeleteUserModal";
+
+export default function UserDetails() {
+  const { id } = useParams();
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [payments, setPayments] = useState([]);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState("");
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
-  const [paymentDate, setPaymentDate] = useState("");
-
-  if (!user || !user.classes || !user.payments) {
+  
+  // Fetch user data when component mounts
+  useEffect(() => {
+    const fetchUserData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Make API call to get user details
+        const response = await axiosClient.get(`/users/${id}`);
+        setUser(response.data);
+        
+        // Fetch user payments
+        const paymentsResponse = await axiosClient.get(`/users/${id}/payments`);
+        setPayments(paymentsResponse.data || []);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setError('Failed to load user data. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchUserData();
+  }, [id]);
+  
+  // Handle user update
+  const handleUserUpdated = (updatedUser) => {
+    setUser(prev => ({ ...prev, ...updatedUser }));
+  };
+  
+  // Handle payment added
+  const handlePaymentAdded = (newPayment) => {
+    setPayments(prev => [...prev, newPayment]);
+  };
+  
+  // Handle user deletion
+  const handleUserDeleted = () => {
+    // Navigate back to users list
+    window.location.href = "/admin/users";
+  };
+  
+  if (loading) {
     return (
-      <div className="container my-5 text-danger">
-        User data is not available.
+      <div className="d-flex justify-content-center p-5">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+  
+  if (error || !user) {
+    return (
+      <div className="alert alert-danger my-5" role="alert">
+        {error || 'User not found'}
       </div>
     );
   }
 
-  // Default avatar or user's profile picture
-  const avatarUrl = user.avatar || "/default-avatar.png";
-
-  const calculateTotal = () => {
-    if (user.role === "teacher") {
-      return user.classes.reduce(
-        (acc, curr) => acc + (parseFloat(curr.hours) * parseFloat(curr.ratePerHour || 0)),
-        0
-      );
-    } else {
-      return user.classes.reduce(
-        (acc, curr) => acc + parseFloat(curr.price.replace(",", ".")),
-        0
-      );
-    }
-  };
-
-  const total = calculateTotal();
-
-  const handlePaymentSubmit = (e) => {
-    e.preventDefault();
-    // Here you would typically make an API call to update the payment
-    const newPayment = {
-      date: paymentDate,
-      amount: paymentAmount,
-      status: paymentStatus,
-      method: paymentMethod
-    };
-    console.log("New payment:", newPayment);
-    setShowPaymentModal(false);
-  };
-
   return (
-    <div className="container my-5">
-      <h4 className="mb-4">← User Details</h4>
-      <div className="row g-4">
-        {/* Left panel */}
-        <div className="col-md-4">
-          <div className="card p-3 shadow-sm">
-            <div className="text-center">
-              <img
-                src={avatarUrl}
-                alt={`${user.name}'s profile`}
-                className="rounded-circle me-2"
-                width="100"
-                height="100"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = "/default-avatar.png";
-                }}
-              />
-              <h5>{user.name}</h5>
-              <p className="text-muted mb-1">{user.email}</p>
-              <div className="d-flex justify-content-center gap-2">
-                <button className="btn btn-light btn-sm"><i className="bi bi-pen"></i></button>
-                <button className="btn btn-danger btn-sm"><i className="bi bi-trash2"></i></button>
-              </div>
-            </div>
-            <hr />
-            <p>
-              <strong>Role:</strong> {user.role}
-            </p>
-            <p>
-              <strong>Phone:</strong> {user.phone}
-            </p>
-            <p>
-              <strong>Address:</strong> {user.address}
-            </p>
-            {user.role === "teacher" && (
-              <p>
-                <strong>Rate per Hour:</strong> ${user.ratePerHour}
-              </p>
-            )}
-            {user.role === "student" && (
-              <p>
-                <strong>Payment Schedule:</strong> {user.paymentSchedule}
-              </p>
-            )}
-            <p>
-              <strong>Payment Type:</strong>
-            </p>
-            <button className="btn btn-outline-dark btn-sm">
-              {user.paymentType}
-            </button>
-          </div>
-        </div>
-
-        {/* Right panel */}
-        <div className="col-md-8">
-          {/* Classes */}
-          <div className="card p-3 shadow-sm mb-4">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <h6>{user.role === "teacher" ? "Teaching Schedule" : "Classes"}</h6>
-              <div>
-                <button 
-                  className="btn bgcolor btn-sm me-2"
-                  onClick={() => setShowPaymentModal(true)}
-                >
-                  {user.role === "teacher" ? "Add Payment" : "Record Payment"}
-                </button>
-                <button className="btn btn-secondary btn-sm me-2">Edit</button>
-                <button className="btn btn-danger btn-sm">Delete</button>
-              </div>
-            </div>
-            <table className="table table-bordered table-hover">
-              <thead className="table-light">
-                <tr>
-                  <th>Modules</th>
-                  <th>Number of Hours</th>
-                  <th>Schedule</th>
-                  {user.role === "teacher" ? (
-                    <th>Rate per Hour</th>
-                  ) : (
-                    <th>Prices</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {user.classes.map((cls, idx) => (
-                  <tr key={idx}>
-                    <td>{cls.module}</td>
-                    <td>{cls.hours}</td>
-                    <td>{cls.schedule}</td>
-                    <td>
-                      {user.role === "teacher" 
-                        ? `$${cls.ratePerHour}/hr`
-                        : `${cls.price} ${cls.selected && <span className="text-warning">✔</span>}`
-                      }
-                    </td>
-                  </tr>
-                ))}
-                <tr>
-                  <td colSpan="3" className="text-end">
-                    <strong>Total</strong>
-                  </td>
-                  <td>
-                    <strong>${total.toFixed(2)}</strong>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Payment History */}
-          <div className="card p-3 shadow-sm">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <h6 className="text-success">Payment History</h6>
-              <div>
-                <button className="btn btn-secondary btn-sm me-2">Edit</button>
-                <button className="btn btn-danger btn-sm">Delete</button>
-              </div>
-            </div>
-            <table className="table table-bordered table-hover">
-              <thead className="table-light">
-                <tr>
-                  <th>Date</th>
-                  <th>Amount</th>
-                  <th>Method</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {user.payments.map((p, idx) => (
-                  <tr key={idx}>
-                    <td>{p.date}</td>
-                    <td>${p.amount}</td>
-                    <td>{p.method}</td>
-                    <td>
-                      <span className={`badge bg-${p.status === 'paid' ? 'success' : 'warning'} text-capitalize`}>
-                        {p.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+    <div className="container py-4">
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h2>User Details</h2>
+        <Link to="/admin/users" className="btn btn-outline-secondary">
+          Back to Users
+        </Link>
       </div>
 
-      {/* Payment Modal */}
-      <Modal show={showPaymentModal} onHide={() => setShowPaymentModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Record Payment</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form onSubmit={handlePaymentSubmit}>
-            <Form.Group className="mb-3">
-              <Form.Label>Amount</Form.Label>
-              <Form.Control
-                type="number"
-                step="0.01"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Payment Method</Form.Label>
-              <Form.Select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                required
-              >
-                <option value="">Select payment method</option>
-                <option value="cash">Cash</option>
-                <option value="bank">Bank Transfer</option>
-                <option value="check">Check</option>
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Payment Date</Form.Label>
-              <Form.Control
-                type="date"
-                value={paymentDate}
-                onChange={(e) => setPaymentDate(e.target.value)}
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Status</Form.Label>
-              <Form.Select
-                value={paymentStatus}
-                onChange={(e) => setPaymentStatus(e.target.value)}
-                required
-              >
-                <option value="">Select status</option>
-                <option value="paid">Paid</option>
-                <option value="pending">Pending</option>
-              </Form.Select>
-            </Form.Group>
-            <div className="text-end">
-              <Button variant="secondary" className="me-2" onClick={() => setShowPaymentModal(false)}>
-                Cancel
-              </Button>
-              <Button variant="primary" type="submit">
-                Save Payment
+      <Row>
+        {/* User Profile Card */}
+        <Col md={4} className="mb-4">
+          <UserProfile 
+            user={user} 
+            onEditClick={() => setShowEditModal(true)}
+            onDeleteClick={() => setShowDeleteModal(true)}
+          />
+          
+          {user.role === 'student' && (
+            <div className="mt-3">
+              <Button variant="primary" size="sm" className="w-100" onClick={() => setShowPaymentModal(true)}>
+                Record Payment
               </Button>
             </div>
-          </Form>
-        </Modal.Body>
-      </Modal>
+          )}
+        </Col>
+
+        <Col md={8}>
+          <Card className="mb-4 shadow-sm">
+            <Card.Body>
+              <Tabs defaultActiveKey="details" className="mb-3">
+                {/* Details Tab */}
+                <Tab eventKey="details" title="Details">
+                  {user.role === 'teacher' && (
+                    <div>
+                      <h5 className="mb-3">Teaching Schedule</h5>
+                      <TeacherScheduleView teacherId={id} />
+                      
+                      <hr className="my-4" />
+                      
+                      <TeacherHoursBySubject teacherId={id} />
+                    </div>
+                  )}
+                  
+                  {user.role === 'student' && (
+                    <div>
+                      <h5 className="mb-3">Student Information</h5>
+                      <Row>
+                        <Col md={6}>
+                          <p><strong>Class:</strong> {user.classroom || 'Not assigned'}</p>
+                          <p><strong>Parents:</strong> {user.parents || 'Not provided'}</p>
+                        </Col>
+                        <Col md={6}>
+                          <p><strong>Enrolled Date:</strong> {user.enrollmentDate || 'Not provided'}</p>
+                        </Col>
+                      </Row>
+                    </div>
+                  )}
+                  
+                  {user.role === 'admin' && (
+                    <div>
+                      <h5 className="mb-3">Admin Information</h5>
+                      <p><strong>Access Level:</strong> {user.accessLevel || 'Standard'}</p>
+                      <p><strong>Permissions:</strong> {user.permissions || 'Default permissions'}</p>
+                    </div>
+                  )}
+                </Tab>
+                
+                {/* Payment History Tab */}
+                <Tab eventKey="payments" title="Payment History">
+                  {payments.length > 0 ? (
+                    <PaymentsList payments={payments} user={user} />
+                  ) : (
+                    <div className="text-center py-3">
+                      <p className="text-muted">No payment records found</p>
+                      {user.role === 'student' && (
+                        <Button variant="primary" onClick={() => setShowPaymentModal(true)}>
+                          Record First Payment
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </Tab>
+                
+                {/* Notes Tab */}
+                <Tab eventKey="notes" title="Notes">
+                  <p className="text-muted">Notes feature coming soon</p>
+                </Tab>
+              </Tabs>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+      
+      {/* Payment Form Modal */}
+      <PaymentFormModal
+        showModal={showPaymentModal}
+        setShowModal={setShowPaymentModal}
+        user={user}
+        onPaymentAdded={handlePaymentAdded}
+      />
+      
+      {/* Edit User Modal */}
+      <EditUserModal
+        showModal={showEditModal}
+        setShowModal={setShowEditModal}
+        user={user}
+        onUserUpdated={handleUserUpdated}
+      />
+      
+      {/* Delete User Modal */}
+      <DeleteUserModal
+        showModal={showDeleteModal}
+        setShowModal={setShowDeleteModal}
+        user={user}
+        onUserDeleted={handleUserDeleted}
+      />
     </div>
   );
 }
-
-export default UserDetails;

@@ -242,19 +242,40 @@ public function nextWeek()
     return response()->json($schedules);
 }
 
-
+/**
+ * GET /api/schedules/period
+ * Get schedules within a specified date period
+ */
 public function byPeriod(Request $request)
 {
-    $period = $request->query('period','today');
+    $fromDate = $request->input('from');
+    $toDate = $request->input('to');
 
-    return match($period) {
-        'this_week' => $this->week(),
-        'next_week' => $this->nextWeek(),
-        default     => $this->today(),
-    };
+    if (!$fromDate || !$toDate) {
+        return response()->json(['error' => 'From and To dates are required'], 400);
+    }
+
+    $schedules = Schedule::with('teacher.user', 'classroom', 'subject')
+        ->whereBetween('created_at', [$fromDate, $toDate])
+        ->orWhere(function($query) use ($fromDate, $toDate) {
+            // Also include recurring schedules for the days of week that fall within the period
+            $startDay = Carbon::parse($fromDate)->format('l');
+            $endDay = Carbon::parse($toDate)->format('l');
+            
+            // Get all days of week between start and end
+            $days = [];
+            $current = Carbon::parse($fromDate);
+            while ($current->lte(Carbon::parse($toDate))) {
+                $days[] = $current->format('l');
+                $current->addDay();
+            }
+            
+            // Filter schedules by these days
+            $query->whereIn('day', $days);
+        })
+        ->get();
+
+    return response()->json($schedules);
 }
-
-
-
 
 }

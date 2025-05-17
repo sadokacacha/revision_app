@@ -66,12 +66,6 @@ const NavBar = () => {
               </button>
             </Link>
 
-            <Link to={`/${user.role}/attendance`}>
-              <button className="btn btn-blue rounded-3" type="button">
-                <i className="bi bi-clipboard2-check"></i> Attendance
-              </button>
-            </Link>
-
             <Link to={`/${user.role}/payments`}>
               <button className="btn btn-blue rounded-3" type="button">
                 <i className="bi bi-wallet2"></i> Payments

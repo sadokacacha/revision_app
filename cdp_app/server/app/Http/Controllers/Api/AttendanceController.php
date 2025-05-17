@@ -7,6 +7,7 @@ use App\Models\Attendance;
 use App\Models\Payment;
 use Illuminate\Http\Request;
 use App\Models\Schedule;
+use App\Models\User;
 
 
 class AttendanceController extends Controller
@@ -78,18 +79,25 @@ public function mark(Request $request)
         'teacher_id'  => 'required|exists:teachers,id',
         'date'        => 'required|date',
         'status'      => 'required|in:present,absent',
-        'hours'       => 'required_if:status,present|numeric|min:1',
+        'hours'       => 'required_if:status,present|numeric|min:0',
     ]);
 
+    // Get the schedule to access related data
+    $schedule = Schedule::with('teacher.user', 'subject', 'classroom')
+        ->findOrFail($data['schedule_id']);
+    
+    // Get the teacher info to calculate payment
+    $teacher = $schedule->teacher;
+    
     // Build the payload for updateOrCreate
     $payload = [
-        'present' => $data['status'] === 'present',   // <— map status→boolean
+        'present' => $data['status'] === 'present',
         'hours'   => $data['status'] === 'present' 
                      ? ($data['hours'] ?? 0) 
                      : 0,
     ];
 
-    // Upsert
+    // Upsert the attendance record
     $attendance = Attendance::updateOrCreate(
         [
           'schedule_id' => $data['schedule_id'],
@@ -98,6 +106,33 @@ public function mark(Request $request)
         ],
         $payload
     );
+    
+    // If teacher is present, create or update payment record
+    if ($data['status'] === 'present' && $data['hours'] > 0) {
+        // Calculate payment amount
+        $hourlyRate = $teacher->hourly_rate ?? 0;
+        $paymentAmount = $hourlyRate * $data['hours'];
+        
+        // Create payment record for the teacher
+        Payment::updateOrCreate(
+            [
+                'user_id' => $teacher->user_id,
+                'date' => $data['date'],
+                'type' => 'teacher_attendance',
+                'reference_id' => $attendance->id
+            ],
+            [
+                'amount' => $paymentAmount,
+                'method' => $teacher->payment_method ?? 'bank',
+                'status' => 'pending',
+                'description' => "Payment for {$schedule->subject->name} class on {$data['date']}"
+            ]
+        );
+        
+        // Add payment info to response
+        $attendance->payment_amount = $paymentAmount;
+        $attendance->hourly_rate = $hourlyRate;
+    }
 
     return response()->json($attendance);
 }
