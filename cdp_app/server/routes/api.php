@@ -18,50 +18,70 @@ use App\Http\Controllers\Api\StudentDashboardController;
 // Handle CORS preflight
 Route::options('/{any}', fn() => response()->json(null, 200))->where('any', '.*');
 
-// Auth Routes
+// =========================
+// Authentication
+// =========================
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout']);
 Route::post('/refresh', [AuthController::class, 'refresh']);
 
+// =========================
 // Protected Routes
+// =========================
 Route::middleware('auth:api')->group(function () {
-    // Get authenticated user
+
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
 
+    // =========================
     // Dashboards by Role
+    // =========================
     Route::get('/admin/dashboard', [AdminDashboardController::class, 'index'])->middleware('role:admin');
     Route::get('/teacher/dashboard', [TeacherDashboardController::class, 'index'])->middleware('role:teacher');
     Route::get('/student/dashboard', [StudentDashboardController::class, 'index'])->middleware('role:student');
 
-    // ADMIN-ONLY Routes
+    // =========================
+    // Admin Only Routes
+    // =========================
     Route::middleware('role:admin')->group(function () {
+
+        // Users & Payments
         Route::apiResource('users', UserController::class);
         Route::get('/users/{id}/payments', [UserController::class, 'payments']);
         Route::post('/users/{id}/payments', [PaymentController::class, 'store']);
+
+        // Teachers
         Route::apiResource('teachers', TeacherController::class);
         Route::get('/teachers/{id}/schedule', [TeacherController::class, 'schedule']);
-        Route::get('/teachers/{id}/hours-by-subject', [TeacherController::class, 'hoursBySubject']);
+        Route::get('teachers/{id}/hours-by-subject', [TeacherController::class, 'hoursBySubject']);
+
+        // Classrooms & Subjects
         Route::apiResource('classrooms', ClassroomController::class);
         Route::apiResource('subjects', SubjectController::class);
 
-        // Schedule Management
+        // =========================
+        // Schedules
+        // =========================
         Route::prefix('schedules')->group(function () {
             Route::get('/', [ScheduleController::class, 'index']);
             Route::post('/', [ScheduleController::class, 'store']);
             Route::put('/{id}', [ScheduleController::class, 'update']);
             Route::delete('/{id}', [ScheduleController::class, 'destroy']);
+
             Route::get('/today', [ScheduleController::class, 'today']);
             Route::get('/week', [ScheduleController::class, 'week']);
             Route::get('/month', [ScheduleController::class, 'month']);
             Route::get('/upcoming', [ScheduleController::class, 'upcomingWeek']);
             Route::get('/period', [ScheduleController::class, 'byPeriod']);
+
             Route::get('/classroom/{id}', [ScheduleController::class, 'getByClassroom']);
             Route::get('/teacher/{id}', [ScheduleController::class, 'getByTeacher']);
         });
 
-        // Attendance Management
+        // =========================
+        // Attendance
+        // =========================
         Route::prefix('attendance')->group(function () {
             Route::post('/mark', [AttendanceController::class, 'mark']);
             Route::get('/today', [AttendanceController::class, 'today']);
@@ -70,7 +90,9 @@ Route::middleware('auth:api')->group(function () {
             Route::get('/history/{id}', [AttendanceController::class, 'history']);
         });
 
-        // Payments Management
+        // =========================
+        // Payments
+        // =========================
         Route::prefix('payments')->group(function () {
             Route::get('/', [PaymentController::class, 'index']);
             Route::post('/', [PaymentController::class, 'store']);
@@ -80,5 +102,7 @@ Route::middleware('auth:api')->group(function () {
             Route::get('/teacher/summary', [PaymentController::class, 'teacherSummary']);
             Route::post('/teacher/{id}/mark-paid', [PaymentController::class, 'markTeacherPaid']);
         });
+
     });
+
 });

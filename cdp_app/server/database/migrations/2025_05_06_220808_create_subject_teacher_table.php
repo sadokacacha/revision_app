@@ -11,12 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-    Schema::create('subject_teacher', function (Blueprint $table) {
-    $table->id();
-    $table->foreignId('subject_id')->constrained()->onDelete('cascade');
-    $table->foreignId('teacher_id')->constrained()->onDelete('cascade');
-    $table->timestamps(); // ← this is missing
-});
+        Schema::create('subject_teacher', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('subject_id')->constrained()->onDelete('cascade');
+            $table->foreignId('teacher_id')->constrained()->onDelete('cascade');
+            // if you already have hours_done from a later migration, leave it
+            $table->integer('hours_done')->default(0);
+            $table->timestamps();        // ← add this
+        });
         
     }
 

@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Teacher;
 use App\Models\Schedule;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class TeacherController extends Controller
 {
@@ -31,35 +31,31 @@ class TeacherController extends Controller
             'classroom_subjects.*.subject_ids.*' => 'exists:subjects,id',
         ]);
 
-        $teacher = Teacher::create([
-            'user_id' => $data['user_id'],
-            'hourly_rate' => $data['hourly_rate'],
-            'payment_method' => $data['payment_method'],
-        ]);
-
-        // Sync basic subjects
-        $teacher->subjects()->sync($data['subjects'] ?? []);
-
-        // Handle classroom-subjects pivot
-        $attach = [];
-        foreach ($data['classroom_subjects'] as $item) {
-            foreach ($item['subject_ids'] as $subjectId) {
-                $attach[] = [
-                    'classroom_id' => $item['classroom_id'],
-                    'subject_id' => $subjectId,
-                ];
-            }
-        }
-
-        // Sync classroom_subject_teacher pivot
-        $teacher->classrooms()->detach();
-        foreach ($attach as $pivot) {
-            $teacher->classrooms()->attach($pivot['classroom_id'], [
-                'subject_id' => $pivot['subject_id'],
+        DB::beginTransaction();
+        try {
+            $teacher = Teacher::create([
+                'user_id' => $data['user_id'],
+                'hourly_rate' => $data['hourly_rate'],
+                'payment_method' => $data['payment_method'],
             ]);
-        }
 
-        return response()->json($teacher->load('user', 'subjects', 'classrooms'), 201);
+            $teacher->subjects()->sync($data['subjects'] ?? []);
+
+            foreach ($data['classroom_subjects'] as $item) {
+                foreach ($item['subject_ids'] as $subjectId) {
+                    $teacher->classrooms()->attach($item['classroom_id'], [
+                        'subject_id' => $subjectId,
+                    ]);
+                }
+            }
+
+            DB::commit();
+            return response()->json($teacher->load('user', 'subjects', 'classrooms'), 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Teacher creation failed: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to create teacher'], 500);
+        }
     }
 
     public function show($id)
@@ -73,37 +69,45 @@ class TeacherController extends Controller
         $teacher = Teacher::findOrFail($id);
 
         $data = $request->validate([
-            'hourly_rate' => 'sometimes|numeric',
-            'payment_method' => 'sometimes|in:check,cash,bank',
-            'subjects' => 'sometimes|array',
+            'hourly_rate' => 'nullable|numeric',
+            'payment_method' => 'nullable|in:check,cash,bank',
+            'subjects' => 'nullable|array',
             'subjects.*' => 'exists:subjects,id',
-            'classroom_subjects' => 'sometimes|array',
+            'classroom_subjects' => 'nullable|array',
             'classroom_subjects.*.classroom_id' => 'required|exists:classrooms,id',
             'classroom_subjects.*.subject_ids' => 'required|array',
             'classroom_subjects.*.subject_ids.*' => 'exists:subjects,id',
         ]);
 
-        $teacher->update([
-            'hourly_rate' => $data['hourly_rate'] ?? $teacher->hourly_rate,
-            'payment_method' => $data['payment_method'] ?? $teacher->payment_method,
-        ]);
+        DB::beginTransaction();
+        try {
+            $teacher->update([
+                'hourly_rate' => $data['hourly_rate'] ?? $teacher->hourly_rate,
+                'payment_method' => $data['payment_method'] ?? $teacher->payment_method,
+            ]);
 
-        if (isset($data['subjects'])) {
-            $teacher->subjects()->sync($data['subjects']);
-        }
+            if (isset($data['subjects'])) {
+                $teacher->subjects()->sync($data['subjects']);
+            }
 
-        if (isset($data['classroom_subjects'])) {
-            $teacher->classrooms()->detach();
-            foreach ($data['classroom_subjects'] as $item) {
-                foreach ($item['subject_ids'] as $subjectId) {
-                    $teacher->classrooms()->attach($item['classroom_id'], [
-                        'subject_id' => $subjectId,
-                    ]);
+            if (isset($data['classroom_subjects'])) {
+                $teacher->classrooms()->detach();
+                foreach ($data['classroom_subjects'] as $item) {
+                    foreach ($item['subject_ids'] as $subjectId) {
+                        $teacher->classrooms()->attach($item['classroom_id'], [
+                            'subject_id' => $subjectId,
+                        ]);
+                    }
                 }
             }
-        }
 
-        return response()->json($teacher->load('user', 'subjects', 'classrooms'));
+            DB::commit();
+            return response()->json($teacher->load('user', 'subjects', 'classrooms'));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Teacher update failed: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to update teacher'], 500);
+        }
     }
 
     public function destroy($id)
@@ -115,151 +119,104 @@ class TeacherController extends Controller
 
         return response()->json(null, 204);
     }
-    
-    /**
-     * Get a teacher's schedule
-     */
+
     public function schedule($id)
     {
         try {
             $teacher = Teacher::findOrFail($id);
-            
-            // Get schedule entries for this teacher
+
             $schedule = Schedule::with(['subject', 'classroom'])
                 ->where('teacher_id', $id)
                 ->orderBy('day')
                 ->orderBy('start_time')
                 ->get();
-                
-            // If no schedule entries found, return fallback data
+
             if ($schedule->isEmpty()) {
-                $fallbackSchedule = [
-                    [
-                        'day' => 'Monday',
-                        'start_time' => '08:30:00',
-                        'end_time' => '10:00:00',
-                        'subject' => ['name' => 'Mathematics'],
-                        'classroom' => ['name' => 'Class 10A']
-                    ],
-                    [
-                        'day' => 'Tuesday',
-                        'start_time' => '10:30:00',
-                        'end_time' => '12:00:00',
-                        'subject' => ['name' => 'Physics'],
-                        'classroom' => ['name' => 'Class 11B']
-                    ],
-                    [
-                        'day' => 'Thursday',
-                        'start_time' => '13:00:00',
-                        'end_time' => '14:30:00',
-                        'subject' => ['name' => 'Chemistry'],
-                        'classroom' => ['name' => 'Class 9C']
-                    ]
-                ];
-                return response()->json($fallbackSchedule);
+                return response()->json($this->fallbackSchedule());
             }
-            
+
             return response()->json($schedule);
         } catch (\Exception $e) {
             Log::error('Error fetching teacher schedule: ' . $e->getMessage());
-            
-            // Return fallback data in case of error
-            $fallbackSchedule = [
-                [
-                    'day' => 'Monday',
-                    'start_time' => '08:30:00',
-                    'end_time' => '10:00:00',
-                    'subject' => ['name' => 'Mathematics'],
-                    'classroom' => ['name' => 'Class 10A']
-                ],
-                [
-                    'day' => 'Tuesday',
-                    'start_time' => '10:30:00',
-                    'end_time' => '12:00:00',
-                    'subject' => ['name' => 'Physics'],
-                    'classroom' => ['name' => 'Class 11B']
-                ],
-                [
-                    'day' => 'Thursday',
-                    'start_time' => '13:00:00',
-                    'end_time' => '14:30:00',
-                    'subject' => ['name' => 'Chemistry'],
-                    'classroom' => ['name' => 'Class 9C']
-                ]
-            ];
-            return response()->json($fallbackSchedule);
+            return response()->json($this->fallbackSchedule());
         }
     }
-    
-    /**
-     * Get hours taught by subject for a teacher
-     */
     public function hoursBySubject($id)
     {
         try {
             $teacher = Teacher::findOrFail($id);
-            
-            // Get hours by subject from the database
-            // This is a simplified implementation - in a real app, you would
-            // calculate this from actual attendance/schedule records
-            $data = DB::table('subjects')
-                ->join('subject_teacher', 'subjects.id', '=', 'subject_teacher.subject_id')
+            $rate = $teacher->hourly_rate;
+
+            // 1) get all subjects this teacher is assigned
+            $subjects = DB::table('subject_teacher')
+                ->join('subjects', 'subject_teacher.subject_id', 'subjects.id')
                 ->where('subject_teacher.teacher_id', $id)
-                ->select('subjects.name as subject', DB::raw('FLOOR(RAND() * 20) + 10 as hours'))
-                ->get()
-                ->map(function($item) use ($teacher) {
-                    return [
-                        'subject' => $item->subject,
-                        'hours' => $item->hours,
-                        'ratePerHour' => $teacher->hourly_rate
-                    ];
-                });
-            
-            // If no data found, return fallback data
-            if ($data->isEmpty()) {
-                $fallbackData = [
-                    [
-                        'subject' => 'Mathematics',
-                        'hours' => 20,
-                        'ratePerHour' => $teacher->hourly_rate ?? 50
-                    ],
-                    [
-                        'subject' => 'Physics',
-                        'hours' => 15,
-                        'ratePerHour' => $teacher->hourly_rate ?? 55
-                    ],
-                    [
-                        'subject' => 'Chemistry',
-                        'hours' => 10,
-                        'ratePerHour' => $teacher->hourly_rate ?? 45
-                    ]
+                ->select('subjects.id','subjects.name')
+                ->get();
+
+            // 2) sum up actual attended hours from attendances
+            $records = DB::table('schedules')
+                ->join('attendances', 'schedules.id', '=', 'attendances.schedule_id')
+                // ensure the attendance row really belongs to this teacher
+                ->where('attendances.teacher_id', $id)
+                ->where('attendances.present', true)
+                ->groupBy('schedules.subject_id')
+                ->select([
+                    'schedules.subject_id',
+                    DB::raw('SUM(attendances.hours) as hours')
+                ])
+                ->get();
+
+            // map to a keyed array [ subject_id => hours ]
+            $hoursBySubject = $records->pluck('hours', 'subject_id');
+
+            // build the final output list
+            $out = [];
+            foreach ($subjects as $sub) {
+                $hours = $hoursBySubject->get($sub->id, 0);
+                $out[] = [
+                    'subject'     => $sub->name,
+                    'hours'       => (float) $hours,
+                    'ratePerHour' => (float) $rate,
                 ];
-                return response()->json($fallbackData);
             }
-                
-            return response()->json($data);
-        } catch (\Exception $e) {
-            Log::error('Error fetching teacher hours by subject: ' . $e->getMessage());
-            
-            // Return fallback data in case of error
-            $fallbackData = [
-                [
-                    'subject' => 'Mathematics',
-                    'hours' => 20,
-                    'ratePerHour' => 50
-                ],
-                [
-                    'subject' => 'Physics',
-                    'hours' => 15,
-                    'ratePerHour' => 55
-                ],
-                [
-                    'subject' => 'Chemistry',
-                    'hours' => 10,
-                    'ratePerHour' => 45
-                ]
-            ];
-            return response()->json($fallbackData);
+
+            return response()->json($out, 200);
+
+        } catch (\Throwable $e) {
+            Log::error("hoursBySubject({$id}) failed: " . $e->getMessage());
+            return response()->json([
+                'error'   => 'Could not calculate teaching hours',
+                'message' => $e->getMessage(),
+            ], 500);
         }
+    }
+
+
+    private function fallbackSchedule()
+    {
+        return [
+            [
+                'day' => 'Monday',
+                'start_time' => '08:30:00',
+                'end_time' => '10:00:00',
+                'subject' => ['name' => 'Mathematics'],
+                'classroom' => ['name' => 'Class 10A']
+            ],
+            [
+                'day' => 'Tuesday',
+                'start_time' => '10:30:00',
+                'end_time' => '12:00:00',
+                'subject' => ['name' => 'Physics'],
+                'classroom' => ['name' => 'Class 11B']
+            ],
+            [
+                'day' => 'Thursday',
+                'start_time' => '13:00:00',
+                'end_time' => '14:30:00',
+                'subject' => ['name' => 'Chemistry'],
+                'classroom' => ['name' => 'Class 9C']
+            ]
+        ];
     }
 }

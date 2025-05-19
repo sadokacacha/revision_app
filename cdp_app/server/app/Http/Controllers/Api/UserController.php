@@ -222,7 +222,7 @@ class UserController extends Controller
             $user = User::findOrFail($id);
             $payments = Payment::where('user_id', $user->id)
                 ->orderBy('date', 'desc')
-                ->get();
+                ->get(['id','amount','status','date']);
             
             return response()->json($payments);
         } catch (\Exception $e) {
@@ -232,5 +232,11 @@ class UserController extends Controller
             ], 500);
         }
     }
+
+
+
+
+
+    
 
 }

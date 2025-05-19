@@ -16,7 +16,7 @@ const AdminManagement = ({
 
   const filteredUsers = users.filter(
     (user) =>
-      (selectedRole === "All Roles" || user.role === selectedRole.toLowerCase()) &&
+      (user.role === "admin") &&
       user.name?.toLowerCase().includes(userSearch.toLowerCase())
   );
 
@@ -106,4 +106,4 @@ const AdminManagement = ({
   );
 };
 
-export default AdminManagement; 
+export default AdminManagement;
