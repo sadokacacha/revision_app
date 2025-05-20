@@ -1,6 +1,31 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axiosClient from '../../axios-client';
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
+  const [counts, setCounts] = useState({
+    teachers: 0,
+    students: 0,
+    admins: 0
+  });
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const response = await axiosClient.get('/users/counts');
+        setCounts(response.data);
+      } catch (error) {
+        console.error('Error fetching user counts:', error);
+      }
+    };
+    fetchCounts();
+  }, []);
+
+  const handleNavigation = (userType) => {
+    navigate(`/admin/users?type=${userType}`);
+  };
+
   return (
     <div>
       <div className="navbarposition">
@@ -101,14 +126,17 @@ const AdminDashboard = () => {
                     <h6 className="mb-0">Teacher Payments</h6>
                   </div>
                   <div>
-                    <a href="/">
+                    <button 
+                      onClick={() => handleNavigation('teacher')}
+                      className="btn btn-link p-0"
+                    >
                       <i className="bi bi-arrow-right"></i>
-                    </a>
+                    </button>
                   </div>
                 </div>
 
                 <div className="small text-muted ">
-                  Total Teachers: <strong>64</strong>
+                  Total Teachers: <strong>{counts.teachers}</strong>
                 </div>
                 <div className="small text-muted">
                   Pending Payments: <strong>12</strong>
@@ -136,13 +164,16 @@ const AdminDashboard = () => {
                     <h6 className="mb-0">Student Payments</h6>
                   </div>
                   <div>
-                    <a href="/">
+                    <button 
+                      onClick={() => handleNavigation('student')}
+                      className="btn btn-link p-0"
+                    >
                       <i className="bi bi-arrow-right"></i>
-                    </a>
+                    </button>
                   </div>
                 </div>
                 <div className="small text-muted">
-                  Total Students: <strong>1245</strong>
+                  Total Students: <strong>{counts.students}</strong>
                 </div>
                 <div className="small text-muted">
                   Pending Tuition: <strong>45</strong>
@@ -169,13 +200,16 @@ const AdminDashboard = () => {
                     <h6 className="mb-0">Administration Payments</h6>
                   </div>
                   <div>
-                    <a href="/">
+                    <button 
+                      onClick={() => handleNavigation('admin')}
+                      className="btn btn-link p-0"
+                    >
                       <i className="bi bi-arrow-right"></i>
-                    </a>
+                    </button>
                   </div>
                 </div>
                 <div className="small text-muted">
-                  Total Students: <strong>1245</strong>
+                  Total Admins: <strong>{counts.admins}</strong>
                 </div>
                 <div className="small text-muted">
                   Pending Tuition: <strong>45</strong>
@@ -191,4 +225,5 @@ const AdminDashboard = () => {
     </div>
   );
 };
-export default AdminDashboard
+
+export default AdminDashboard;

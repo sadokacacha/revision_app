@@ -5,6 +5,7 @@ import {
   Button
 } from "react-bootstrap";
 import axiosClient from "../../../axios-client";
+import { useSearchParams } from "react-router-dom";
 
 // Import components
 import StudentManagement from "./components/StudentManagement";
@@ -13,7 +14,8 @@ import AdminManagement from "./components/AdminManagement";
 import UserFormModal from "./components/UserFormModal";
 
 export default function Management() {
-  const [activeRole, setActiveRole] = useState("student");
+  const [searchParams] = useSearchParams();
+  const [activeRole, setActiveRole] = useState(searchParams.get('type') || "student");
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
@@ -92,6 +94,14 @@ export default function Management() {
     setShowModal(true);
   };
 
+  // Update activeRole when URL parameter changes
+  useEffect(() => {
+    const type = searchParams.get('type');
+    if (type && ['student', 'teacher', 'admin'].includes(type)) {
+      setActiveRole(type);
+    }
+  }, [searchParams]);
+
   return (
     <Container className="py-4">
       <div className="text-center mb-4">
@@ -131,6 +141,7 @@ export default function Management() {
           setSearch={setSearch}
           loadingUsers={loadingUsers}
           showUserForm={() => showUserForm('teacher')}
+          onTeacherAdded={users.length}
         />
       )}
       

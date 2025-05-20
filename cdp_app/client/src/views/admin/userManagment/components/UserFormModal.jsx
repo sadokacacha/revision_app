@@ -66,18 +66,10 @@ const UserFormModal = ({ showModal, setShowModal, onUserCreated, availableClassr
       
       // Add role-specific data
       if (userForm.role === 'teacher') {
-        console.log("Teacher data:", {
-          ratePerHour: parseFloat(userForm.ratePerHour) || 0,
-          subjects: userForm.subjects,
-          classrooms: userForm.classrooms
-        });
-        
-        userData.teacherData = {
-          ratePerHour: parseFloat(userForm.ratePerHour) || 0,
-          paymentMethod: userForm.paymentMethod,
-          subjects: userForm.subjects,
-          classrooms: userForm.classrooms,
-        };
+        userData.hourly_rate = parseFloat(userForm.ratePerHour) || 0;
+        userData.payment_method = userForm.paymentMethod;
+        userData.subjects = userForm.subjects;
+        userData.classrooms = userForm.classrooms;
       } else if (userForm.role === 'student') {
         // Calculate fees based on payment style
         const baseMonthlyFee = 300;

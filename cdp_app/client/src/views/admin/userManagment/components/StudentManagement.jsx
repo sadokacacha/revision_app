@@ -1,16 +1,16 @@
 import React, { useState } from "react";
 import { Card, Table, Form, Button, Nav, Badge, ButtonGroup, Col } from "react-bootstrap";
-import { Mail, Printer, ChevronRight, CheckCircle, Circle, XCircle } from "lucide-react";
+import { Mail, Printer, ChevronRight, CheckCircle, Circle, XCircle, Receipt } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axiosClient from "../../../../axios-client";
 
 const getStatusDetails = (status) => {
   switch (status) {
-    case "succeeded":
+    case "paid":
       return {
         variant: "success",
         icon: <CheckCircle size={16} />,
-        text: "Succeeded",
+        text: "Paid",
       };
     case "pending":
       return {
@@ -18,14 +18,12 @@ const getStatusDetails = (status) => {
         icon: <Circle size={16} />,
         text: "Pending",
       };
-    case "declined":
+    case "overdue":
       return {
         variant: "danger",
         icon: <XCircle size={16} />,
-        text: "Declined",
+        text: "Overdue",
       };
-    case "refunded":
-      return { variant: "info", icon: <Circle size={16} />, text: "Refunded" };
     default:
       return {
         variant: "secondary",
@@ -59,6 +57,24 @@ const StudentManagement = ({
   
   const handleViewUser = (userId) => {
     navigate(`/admin/users/${userId}`);
+  };
+
+  const handlePrintReceipt = async (paymentId) => {
+    try {
+      const response = await axiosClient.get(`/payments/${paymentId}/receipt`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `receipt-${paymentId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error('Error generating receipt:', error);
+      alert('Failed to generate receipt');
+    }
   };
   
   const markStudentPayment = async (studentId) => {
@@ -163,6 +179,9 @@ const StudentManagement = ({
                 <th>Email</th>
                 <th>Class</th>
                 <th>Payment Style</th>
+                <th>Payment Method</th>
+                <th>Last Payment</th>
+                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -170,33 +189,48 @@ const StudentManagement = ({
               {studentUsers.length > 0 ? (
                 studentUsers
                   .filter(student => student.name?.toLowerCase().includes(userSearch.toLowerCase()))
-                  .map((student) => (
-                    <tr key={student.id}>
-                      <td>{student.name}</td>
-                      <td>{student.email}</td>
-                      <td>{Array.isArray(student.classes) ? student.classes.join(", ") : student.classes}</td>
-                      <td>{student.paymentStyle || 'monthly'}</td>
-                      <td className="d-flex gap-2 justify-content-center">
-                        <Button 
-                          variant="success" 
-                          size="sm"
-                          onClick={() => markStudentPayment(student.id)}
-                        >
-                          Record Payment
-                        </Button>
-                        <Button 
-                          variant="primary" 
-                          size="sm"
-                          onClick={() => handleViewUser(student.id)}
-                        >
-                          <ChevronRight size={18} />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
+                  .map((student) => {
+                    const lastPayment = paymentsArray
+                      .filter(p => p.userId === student.id)
+                      .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+                    
+                    const statusDetails = getStatusDetails(lastPayment?.status || 'pending');
+                    
+                    return (
+                      <tr key={student.id}>
+                        <td>{student.name}</td>
+                        <td>{student.email}</td>
+                        <td>{Array.isArray(student.classes) ? student.classes.join(", ") : student.classes}</td>
+                        <td>{student.paymentStyle || 'monthly'}</td>
+                        <td>{student.paymentMethod || 'bank'}</td>
+                        <td>{lastPayment ? new Date(lastPayment.date).toLocaleDateString() : 'No payments'}</td>
+                        <td>
+                          <Badge bg={statusDetails.variant}>
+                            {statusDetails.icon} {statusDetails.text}
+                          </Badge>
+                        </td>
+                        <td className="d-flex gap-2 justify-content-center">
+                          <Button 
+                            variant="success" 
+                            size="sm"
+                            onClick={() => markStudentPayment(student.id)}
+                          >
+                            Record Payment
+                          </Button>
+                          <Button 
+                            variant="primary" 
+                            size="sm"
+                            onClick={() => handleViewUser(student.id)}
+                          >
+                            <ChevronRight size={18} />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })
               ) : (
                 <tr>
-                  <td colSpan="5" className="text-center">
+                  <td colSpan="8" className="text-center">
                     No students found
                   </td>
                 </tr>
@@ -217,10 +251,10 @@ const StudentManagement = ({
           </Nav.Item>
           <Nav.Item>
             <Nav.Link
-              active={activeTab === "succeeded"}
-              onClick={() => setActiveTab("succeeded")}
+              active={activeTab === "paid"}
+              onClick={() => setActiveTab("paid")}
             >
-              Succeeded
+              Paid
             </Nav.Link>
           </Nav.Item>
           <Nav.Item>
@@ -229,6 +263,14 @@ const StudentManagement = ({
               onClick={() => setActiveTab("pending")}
             >
               Pending
+            </Nav.Link>
+          </Nav.Item>
+          <Nav.Item>
+            <Nav.Link
+              active={activeTab === "overdue"}
+              onClick={() => setActiveTab("overdue")}
+            >
+              Overdue
             </Nav.Link>
           </Nav.Item>
         </Nav>
@@ -254,41 +296,38 @@ const StudentManagement = ({
             </thead>
             <tbody>
               {filteredPayments.length > 0 ? (
-                filteredPayments.map((payment) => (
-                  <tr key={payment.id}>
-                    <td>{payment.name}</td>
-                    <td>${payment.amount?.toFixed(2)}</td>
-                    <td>{payment.paymentMethod}</td>
-                    <td>{payment.paymentType}</td>
-                    <td>{payment.creationDate}</td>
-                    <td>
-                      <Badge
-                        bg={getStatusDetails(payment.status).variant}
-                        className="d-flex align-items-center gap-1"
-                      >
-                        {getStatusDetails(payment.status).icon}
-                        {getStatusDetails(payment.status).text}
-                      </Badge>
-                    </td>
-                    <td>
-                      <ButtonGroup>
-                        <Button variant="light" size="sm">
-                          <Mail size={16} />
+                filteredPayments.map((payment) => {
+                  const student = studentUsers.find(s => s.id === payment.userId);
+                  const statusDetails = getStatusDetails(payment.status);
+                  
+                  return (
+                    <tr key={payment.id}>
+                      <td>{student?.name || 'Unknown'}</td>
+                      <td>${payment.amount}</td>
+                      <td>{payment.method}</td>
+                      <td>{payment.paymentStyle}</td>
+                      <td>{new Date(payment.date).toLocaleDateString()}</td>
+                      <td>
+                        <Badge bg={statusDetails.variant}>
+                          {statusDetails.icon} {statusDetails.text}
+                        </Badge>
+                      </td>
+                      <td>
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => handlePrintReceipt(payment.id)}
+                        >
+                          <Receipt size={16} /> Receipt
                         </Button>
-                        <Button variant="light" size="sm">
-                          <Printer size={16} />
-                        </Button>
-                        <Button variant="light" size="sm">
-                          <i className="bi bi-three-dots"></i>
-                        </Button>
-                      </ButtonGroup>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan="7" className="text-center">
-                    No payments found
+                    No payment records found
                   </td>
                 </tr>
               )}

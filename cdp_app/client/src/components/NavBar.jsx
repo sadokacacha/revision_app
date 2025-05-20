@@ -66,6 +66,11 @@ const NavBar = () => {
               </button>
             </Link>
 
+            <Link to={`/${user.role}/profile`}>
+              <button className="btn btn-blue rounded-3" type="button">
+                <i className="bi bi-person-circle"></i> Profile
+              </button>
+            </Link>
             
             {user.role === 'admin' && (
               <Link to={`/${user.role}/users`}>

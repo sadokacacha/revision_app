@@ -21,10 +21,11 @@ import Attendance from './views/admin/userManagment/Attendance';
 // Teacher Views
 import TeacherDashboard from './views/teacher/TeacherDashboard';
 
-
 // Student Views
 import StudentDashboard from './views/student/StudentDashboard';
 
+// Profile View
+import Profile from './components/Profile';
 
 export default function App() {
   const { user, setUser } = useStateContext();
@@ -122,6 +123,7 @@ export default function App() {
       }>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="profile" element={<Profile />} />
         
         {/* User Management */}
         <Route path="users" element={<UserManagement />} />
@@ -145,6 +147,7 @@ export default function App() {
       }>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<TeacherDashboard />} />
+        <Route path="profile" element={<Profile />} />
       </Route>
 
       {/* Student Routes */}
@@ -155,6 +158,7 @@ export default function App() {
       }>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<StudentDashboard />} />
+        <Route path="profile" element={<Profile />} />
       </Route>
 
       {/* Root Redirect */}

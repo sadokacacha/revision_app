@@ -18,6 +18,7 @@ export default function UserDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [payments, setPayments] = useState([]);
+  const [attendance, setAttendance] = useState([]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -49,6 +50,26 @@ export default function UserDetails() {
             console.error('Error fetching payment data:', paymentError);
             setPayments([]);
           }
+
+          // Fetch teacher attendance if user is a teacher
+          if (response.data.role === 'teacher') {
+            try {
+              const teacherProfileId = response.data.teacher?.id || id;
+              if (teacherProfileId) {
+                const attendanceResponse = await axiosClient.get(`/teachers/${teacherProfileId}/attendance`);
+                if (Array.isArray(attendanceResponse.data)) {
+                  setAttendance(attendanceResponse.data);
+                } else {
+                  setAttendance([]);
+                }
+              } else {
+                setAttendance([]);
+              }
+            } catch (attendanceError) {
+              setAttendance([]);
+              // Optionally show a message: "No attendance data available"
+            }
+          }
         } else {
           console.error('Invalid user data received:', response.data);
           setError('Invalid user data received from server.');
@@ -66,9 +87,23 @@ export default function UserDetails() {
     }
   }, [id]);
   
+  // Calculate teacher's total hours and payment
+  const calculateTeacherPayments = () => {
+    if (!user || user.role !== 'teacher' || !attendance.length) return null;
+    
+    const presentDays = attendance.filter(record => record.status === 'present');
+    const totalHours = presentDays.reduce((sum, day) => sum + (day.hours || 8), 0);
+    const totalPayment = totalHours * (user.ratePerHour || 0);
+    
+    return {
+      totalHours,
+      totalPayment,
+      presentDays: presentDays.length
+    };
+  };
+  
   // Handle user update
   const handleUserUpdated = (updatedUser) => {
-    // Create a new object to ensure React detects the change
     setUser(prev => ({ ...prev, ...updatedUser }));
   };
   
@@ -81,8 +116,29 @@ export default function UserDetails() {
   
   // Handle user deletion
   const handleUserDeleted = () => {
-    // Navigate back to users list
     window.location.href = "/admin/users";
+  };
+
+  // Handle teacher payment
+  const handleTeacherPayment = async () => {
+    try {
+      const paymentData = {
+        userId: id,
+        amount: calculateTeacherPayments().totalPayment,
+        date: new Date().toISOString().split('T')[0],
+        status: 'paid',
+        method: 'bank',
+        type: 'salary',
+        hours: calculateTeacherPayments().totalHours
+      };
+      
+      const response = await axiosClient.post(`/users/${id}/payments`, paymentData);
+      handlePaymentAdded(response.data);
+      alert('Teacher payment recorded successfully!');
+    } catch (error) {
+      console.error('Error recording teacher payment:', error);
+      alert('Failed to record teacher payment');
+    }
   };
   
   if (loading) {
@@ -107,6 +163,11 @@ export default function UserDetails() {
       </div>
     );
   }
+
+  const teacherPayments = calculateTeacherPayments();
+
+  const today = new Date().toISOString().split('T')[0];
+  const todayAttendance = attendance.find(a => a.date === today);
 
   return (
     <div className="container py-4">
@@ -133,6 +194,25 @@ export default function UserDetails() {
               </Button>
             </div>
           )}
+
+          {user.role === 'teacher' && teacherPayments && (
+            <Card className="mt-3">
+              <Card.Body>
+                <h6>This Month's Summary</h6>
+                <p className="mb-1">Total Hours: {teacherPayments.totalHours}</p>
+                <p className="mb-1">Present Days: {teacherPayments.presentDays}</p>
+                <p className="mb-3">Total Payment: ${teacherPayments.totalPayment}</p>
+                <Button 
+                  variant="success" 
+                  size="sm" 
+                  className="w-100"
+                  onClick={handleTeacherPayment}
+                >
+                  Record Payment
+                </Button>
+              </Card.Body>
+            </Card>
+          )}
         </Col>
 
         <Col md={8}>
@@ -143,12 +223,50 @@ export default function UserDetails() {
                 <Tab eventKey="details" title="Details">
                   {user.role === 'teacher' && (
                     <div>
-                      <h5 className="mb-3">Teaching Schedule</h5>
-                      <TeacherScheduleView teacherId={id} />
-                      
+                      <h5 className="mb-3">Teaching Information</h5>
+                      <Row>
+                        <Col md={6}>
+                          <p><strong>Subjects:</strong> {user.modules && user.modules.length > 0 ? user.modules.map(m => m.name).join(", ") : "Not assigned"}</p>
+                          <p><strong>Classes:</strong> {user.classrooms ? (Array.isArray(user.classrooms) ? user.classrooms.join(", ") : user.classrooms) : "Not assigned"}</p>
+                          <p><strong>Rate per Hour:</strong> ${user.hourly_rate || user.ratePerHour || 0}/hr</p>
+                          <p><strong>Payment Method:</strong> {user.payment_method || "Not set"}</p>
+                        </Col>
+                        <Col md={6}>
+                          <p><strong>Total Due This Month:</strong> ${user.total_due || 0}</p>
+                          <p><strong>Modules Taught:</strong></p>
+                          <ul>
+                            {user.modules && user.modules.length > 0 ? user.modules.map(m => (
+                              <li key={m.id}>
+                                {m.name}: {m.hours_done}h x ${m.price_per_hour}/hr = ${m.price_due}
+                              </li>
+                            )) : <li>No modules</li>}
+                          </ul>
+                        </Col>
+                      </Row>
                       <hr className="my-4" />
-                      
-                      <TeacherHoursBySubject teacherId={id} />
+                      <h5 className="mb-3">Payment History</h5>
+                      {user.payments && user.payments.length > 0 ? (
+                        <Table responsive bordered hover>
+                          <thead className="table-light">
+                            <tr>
+                              <th>Date</th>
+                              <th>Amount</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {user.payments.map((p) => (
+                              <tr key={p.id}>
+                                <td>{new Date(p.date).toLocaleDateString()}</td>
+                                <td>${p.amount}</td>
+                                <td>{p.status}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </Table>
+                      ) : (
+                        <p className="text-muted">No payment records found</p>
+                      )}
                     </div>
                   )}
                   
@@ -159,11 +277,40 @@ export default function UserDetails() {
                         <Col md={6}>
                           <p><strong>Class:</strong> {user.classroom || 'Not assigned'}</p>
                           <p><strong>Parents:</strong> {user.parents || 'Not provided'}</p>
+                          <p><strong>Payment Style:</strong> {user.payment_style || user.paymentStyle || 'monthly'}</p>
+                          <p><strong>Payment Method:</strong> {user.payment_method || user.paymentMethod || 'bank'}</p>
                         </Col>
                         <Col md={6}>
                           <p><strong>Enrolled Date:</strong> {user.enrollmentDate || 'Not provided'}</p>
+                          <p><strong>Monthly Fee:</strong> ${user.monthlyFee || 0}</p>
+                          <p><strong>Semester Fee:</strong> ${user.semesterFee || 0}</p>
+                          <p><strong>Full Year Fee:</strong> ${user.fullYearFee || 0}</p>
                         </Col>
                       </Row>
+                      <hr className="my-4" />
+                      <h5 className="mb-3">Payment History</h5>
+                      {Array.isArray(payments) && payments.length > 0 ? (
+                        <Table responsive bordered hover>
+                          <thead className="table-light">
+                            <tr>
+                              <th>Date</th>
+                              <th>Amount</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {payments.map((p) => (
+                              <tr key={p.id}>
+                                <td>{new Date(p.date).toLocaleDateString()}</td>
+                                <td>${p.amount}</td>
+                                <td>{p.status}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </Table>
+                      ) : (
+                        <p className="text-muted">No payment records found</p>
+                      )}
                     </div>
                   )}
                   
@@ -190,11 +337,6 @@ export default function UserDetails() {
                       )}
                     </div>
                   )}
-                </Tab>
-                
-                {/* Notes Tab */}
-                <Tab eventKey="notes" title="Notes">
-                  <p className="text-muted">Notes feature coming soon</p>
                 </Tab>
               </Tabs>
             </Card.Body>

@@ -55,6 +55,7 @@ Route::middleware('auth:api')->group(function () {
         Route::apiResource('teachers', TeacherController::class);
         Route::get('/teachers/{id}/schedule', [TeacherController::class, 'schedule']);
         Route::get('teachers/{id}/hours-by-subject', [TeacherController::class, 'hoursBySubject']);
+        Route::get('/teachers/{id}/attendance', [TeacherController::class, 'attendance']);
 
         // Classrooms & Subjects
         Route::apiResource('classrooms', ClassroomController::class);

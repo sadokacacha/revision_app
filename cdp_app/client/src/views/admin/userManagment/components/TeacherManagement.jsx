@@ -1,25 +1,39 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Card, Table, Form, Button } from "react-bootstrap";
 import { ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import axiosClient from "../../../../axios-client";
 import TodaysTeacherList from "./TodaysTeacherList";
 
-const TeacherManagement = ({ 
-  users, 
-  search, 
-  setSearch, 
-  loadingUsers, 
-  showUserForm
-}) => {
+const TeacherManagement = ({ search, setSearch, loadingUsers, showUserForm, onTeacherAdded }) => {
   const navigate = useNavigate();
-  
-  // Filter users to show only teachers
-  const teacherUsers = users.filter(user => user.role === 'teacher');
-  
-  const handleViewUser = (teacherId) => {
-    navigate(`/admin/users/${teacherId}`);
+  const [teachers, setTeachers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTeachers = async () => {
+      setLoading(true);
+      try {
+        const res = await axiosClient.get("/teachers");
+        setTeachers(res.data);
+      } catch (err) {
+        setTeachers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTeachers();
+  }, [onTeacherAdded]);
+
+  const handleViewUser = (teacher) => {
+    navigate(`/admin/users/${teacher.user.id}`);
   };
-  
+
+  // Filter by search
+  const filteredTeachers = teachers.filter((teacher) =>
+    teacher.user?.name?.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <Card className="mb-4 shadow-sm">
       <Card.Body>
@@ -34,15 +48,12 @@ const TeacherManagement = ({
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <Button 
-            id="color"
-            onClick={showUserForm}
-          >
+          <Button id="color" onClick={showUserForm}>
             Add Teacher
           </Button>
         </div>
 
-        {loadingUsers ? (
+        {loading ? (
           <div className="text-center py-4">
             <div className="spinner-border text-primary" role="status">
               <span className="visually-hidden">Loading...</span>
@@ -55,34 +66,44 @@ const TeacherManagement = ({
                 <th>Name</th>
                 <th>Email</th>
                 <th>Subjects</th>
+                <th>Classes</th>
                 <th>Rate / Hour</th>
-                <th>Detail</th>
+                <th>Payment Method</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {teacherUsers.length > 0 ? (
-                teacherUsers
-                  .filter(teacher => teacher.name?.toLowerCase().includes(search.toLowerCase()))
-                  .map((teacher) => (
-                    <tr key={teacher.id}>
-                      <td>{teacher.name}</td>
-                      <td>{teacher.email}</td>
-                      <td>{Array.isArray(teacher.subjects) ? teacher.subjects.join(", ") : teacher.subjects || "Not assigned"}</td>
-                      <td>${teacher.ratePerHour || 0}</td>
-                      <td className="text-center">
-                        <Button 
-                          variant="primary" 
-                          size="sm"
-                          onClick={() => handleViewUser(teacher.id)}
-                        >
-                          <ChevronRight size={18} />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
+              {filteredTeachers.length > 0 ? (
+                filteredTeachers.map((teacher) => (
+                  <tr key={teacher.id}>
+                    <td>{teacher.user?.name}</td>
+                    <td>{teacher.user?.email}</td>
+                    <td>
+                      {teacher.subjects && teacher.subjects.length > 0
+                        ? teacher.subjects.map((s) => s.name).join(", ")
+                        : "Not assigned"}
+                    </td>
+                    <td>
+                      {teacher.classrooms && teacher.classrooms.length > 0
+                        ? teacher.classrooms.map((c) => c.name).join(", ")
+                        : "Not assigned"}
+                    </td>
+                    <td>${teacher.hourly_rate || 0}/hr</td>
+                    <td>{teacher.payment_method || "Not set"}</td>
+                    <td className="d-flex gap-2 justify-content-center">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleViewUser(teacher)}
+                      >
+                        <ChevronRight size={18} />
+                      </Button>
+                    </td>
+                  </tr>
+                ))
               ) : (
                 <tr>
-                  <td colSpan="5" className="text-center">
+                  <td colSpan="7" className="text-center">
                     No teachers found
                   </td>
                 </tr>

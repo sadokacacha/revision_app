@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Teacher;
 use App\Models\Schedule;
+use App\Models\Attendance;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -31,6 +32,15 @@ class TeacherController extends Controller
             'classroom_subjects.*.subject_ids.*' => 'exists:subjects,id',
         ]);
 
+        // Ensure the user exists and has the teacher role
+        $user = \App\Models\User::find($data['user_id']);
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+        if (!$user->hasRole('teacher')) {
+            return response()->json(['error' => 'User must have the teacher role'], 422);
+        }
+
         DB::beginTransaction();
         try {
             $teacher = Teacher::create([
@@ -50,6 +60,7 @@ class TeacherController extends Controller
             }
 
             DB::commit();
+            // Always return the full teacher with all relations
             return response()->json($teacher->load('user', 'subjects', 'classrooms'), 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -142,7 +153,7 @@ class TeacherController extends Controller
         }
     }
 
-     public function hoursBySubject($id)
+    public function hoursBySubject($id)
     {
         try {
             $teacher = Teacher::findOrFail($id);
@@ -192,6 +203,38 @@ class TeacherController extends Controller
         }
     }
 
+    public function attendance($id)
+    {
+        try {
+            $teacher = Teacher::findOrFail($id);
+            
+            // Get all attendance records for this teacher
+            $attendance = Attendance::with(['schedule.subject', 'schedule.classroom'])
+                ->where('teacher_id', $id)
+                ->orderBy('date', 'desc')
+                ->get()
+                ->map(function ($record) {
+                    return [
+                        'id' => $record->id,
+                        'date' => $record->date,
+                        'status' => $record->present ? 'present' : 'absent',
+                        'hours' => $record->hours,
+                        'subject' => $record->schedule->subject->name,
+                        'classroom' => $record->schedule->classroom->name,
+                        'start_time' => $record->schedule->start_time,
+                        'end_time' => $record->schedule->end_time
+                    ];
+                });
+
+            return response()->json($attendance);
+        } catch (\Exception $e) {
+            Log::error("attendance({$id}) failed: " . $e->getMessage());
+            return response()->json([
+                'error' => 'Could not fetch attendance records',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 
     private function fallbackSchedule()
     {

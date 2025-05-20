@@ -140,7 +140,17 @@ public function show($id)
             ]);
     
             $teacher->subjects()->sync($data['subjects'] ?? []);
-            $teacher->classrooms()->sync($data['classrooms'] ?? []);
+
+            // Attach classrooms and subjects using the classroom_subject_teacher pivot
+            if (!empty($data['classrooms']) && !empty($data['subjects'])) {
+                foreach ($data['classrooms'] as $classroomId) {
+                    foreach ($data['subjects'] as $subjectId) {
+                        $teacher->classrooms()->attach($classroomId, [
+                            'subject_id' => $subjectId,
+                        ]);
+                    }
+                }
+            }
         }
     
         return response()->json($user->load('teacher.subjects', 'teacher.classrooms'), 201);
