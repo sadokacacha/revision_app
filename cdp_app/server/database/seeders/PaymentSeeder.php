@@ -5,16 +5,17 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Payment;
-
 class PaymentSeeder extends Seeder
 {
     public function run(): void
     {
-        // Find the first user with role=teacher
-        $teacher = User::whereHas('roles', fn($q) => $q->where('name', 'teacher'))->first();
+        // Find the teacher PROFILE, not just the user
+        $teacherUser = User::whereHas('roles', fn($q) => 
+            $q->where('name', 'teacher')
+        )->first();
 
-        if (! $teacher) {
-            $this->command->warn('No teacher found—skipping PaymentSeeder');
+        if (! $teacherUser) {
+            $this->command->warn('No teacher user found — skipping PaymentSeeder');
             return;
         }
 
@@ -27,15 +28,15 @@ class PaymentSeeder extends Seeder
 
         foreach ($payments as $data) {
             Payment::create([
-                'user_id' => $teacher->id,
-                'type'    => 'teacher',      // <— required now
-                'method'  => 'bank',         // <— required now
+                'user_id' => $teacherUser->id,
+                'type'    => 'teacher',      // <-- required by your migration
+                'method'  => 'bank',         // <-- required by your migration
                 'amount'  => $data['amount'],
                 'date'    => $data['date'],
                 'status'  => $data['status'],
             ]);
         }
 
-        $this->command->info("✅ Seeded payments for teacher #{$teacher->id}");
+        $this->command->info("✅ Seeded ".count($payments)." payments for teacher #{$teacherUser->id}");
     }
 }

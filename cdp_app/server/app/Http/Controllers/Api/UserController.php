@@ -39,82 +39,73 @@ class UserController extends Controller
 
 
     // GET /api/users/{id}
-   public function show($id)
+public function show($id)
 {
     $user = User::with('roles')->findOrFail($id);
     $role = $user->roles->pluck('name')->first();
 
-    $base = [
-        'id'    => $user->id,
-        'name'  => $user->name,
-        'email' => $user->email,
-        'role'  => $role,
-    ];
-
-    // If it's a teacher, build their detailed breakdown
     if ($role === 'teacher') {
         $teacher    = $user->teacher;
         $hourlyRate = $teacher->hourly_rate;
-        $today      = Carbon::now()->startOfMonth();
+        $startOfMonth = Carbon::now()->startOfMonth();
+        $endOfMonth   = Carbon::now()->endOfMonth();
 
-        // Eager‑load schedules and their attendances
-        $schedules = Schedule::with('attendances')
+        // load attendances in this month
+        $attendances = Attendance::with('schedule.subject')
             ->where('teacher_id', $teacher->id)
-            ->whereDate('day_of_week','>=',$today) // only this month
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->get();
 
-        // Group schedules by subject
-        $bySubject = $schedules->groupBy('subject_id');
+        // group by subject_id
+        $bySubject = $attendances->groupBy(function($a){
+            return $a->schedule->subject_id;
+        });
 
         $modules = [];
         $total   = 0;
 
-        foreach ($bySubject as $subjectId => $group) {
-            $sub = $group->first()->subject;
-            
-            // 1) total scheduled hours for this subject
-            $scheduledHours = $group->sum(function($sch){
-                $start = Carbon::parse($sch->start_time);
-                $end   = Carbon::parse($sch->end_time);
-                return $end->diffInMinutes($start) / 60;
-            });
+        foreach ($bySubject as $subjectId => $records) {
+            $subject = $records->first()->schedule->subject;
 
-            // 2) total *attended* hours (via attendance records)
-            $attendedHours = Attendance::whereIn('schedule_id', $group->pluck('id'))
-                ->whereMonth('date', $today->month)
-                ->whereYear('date', $today->year)
-                ->sum('hours');
+            // sum actual hours taught
+            $attendedHours = $records->sum('hours');
 
-            $due = $attendedHours * $hourlyRate;
+            $due  = $attendedHours * $hourlyRate;
             $total += $due;
 
             $modules[] = [
-                'id'               => $sub->id,
-                'name'             => $sub->name,
-                'hours_required'   => round($scheduledHours,2),
-                'hours_done'       => round($attendedHours,2),
-                'price_per_hour'   => $hourlyRate,
-                'price_due'        => round($due,2),
+                'id'             => $subject->id,
+                'name'           => $subject->name,
+                'hours_done'     => round($attendedHours, 2),
+                'price_per_hour' => $hourlyRate,
+                'price_due'      => round($due, 2),
             ];
         }
 
-        // pull in any manual payments they've received
+        // fetch any manual payments
         $payments = Payment::where('user_id', $user->id)
-                            ->orderBy('date','desc')
-                            ->get(['id','amount','status','date']);
+            ->orderBy('date','desc')
+            ->get(['id','amount','status','date']);
 
-        return response()->json(array_merge($base, [
-            'payment_method' => $teacher->payment_method,
+        return response()->json([
+            'id'             => $user->id,
+            'name'           => $user->name,
+            'email'          => $user->email,
+            'role'           => $role,
             'modules'        => $modules,
-            'total_due'      => round($total,2),
+            'total_due'      => round($total, 2),
             'payments'       => $payments,
-        ]));
+        ]);
     }
 
-    // student or admin — just basic info
-    return response()->json($base);
+    // non‐teacher
+    return response()->json([
+        'id'    => $user->id,
+        'name'  => $user->name,
+        'email' => $user->email,
+        'role'  => $role,
+    ]);
 }
-
     // POST /api/users
     
     public function store(Request $request)
