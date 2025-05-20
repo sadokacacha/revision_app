@@ -25,5 +25,9 @@ php artisan serve
 
 ### for the front
 cd client
+#
+
 npm install
+#
+
 npm run dev
