@@ -13,9 +13,9 @@ export default function TeacherHoursBySubject({ teacherId }) {
     setError(null);
 
     axiosClient
-      .get(`/teachers/${teacherId}/hours-by-subject`)
-      .then((resp) => {
-        setData(Array.isArray(resp) ? resp : []);
+    .get(`/teachers/${teacherId}/hours-by-subject`)   
+       .then((response) => {
+        setData(Array.isArray(response.data) ? response.data : []);
       })
       .catch((err) => {
         console.error('Error fetching hours:', err);

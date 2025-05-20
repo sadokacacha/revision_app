@@ -20,15 +20,11 @@ import Attendance from './views/admin/userManagment/Attendance';
 
 // Teacher Views
 import TeacherDashboard from './views/teacher/TeacherDashboard';
-import TeacherSchedule from './views/teacher/Schedule';
-import TeacherAttendance from './views/teacher/Attendance';
-import TeacherPayments from './views/teacher/Payments';
+
 
 // Student Views
 import StudentDashboard from './views/student/StudentDashboard';
-import StudentSchedule from './views/student/Schedule';
-import StudentAttendance from './views/student/Attendance';
-import StudentPayments from './views/student/Payments';
+
 
 export default function App() {
   const { user, setUser } = useStateContext();
@@ -149,9 +145,6 @@ export default function App() {
       }>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<TeacherDashboard />} />
-        <Route path="schedule" element={<TeacherSchedule />} />
-        <Route path="attendance" element={<TeacherAttendance />} />
-        <Route path="payments" element={<TeacherPayments />} />
       </Route>
 
       {/* Student Routes */}
@@ -162,9 +155,6 @@ export default function App() {
       }>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<StudentDashboard />} />
-        <Route path="schedule" element={<StudentSchedule />} />
-        <Route path="attendance" element={<StudentAttendance />} />
-        <Route path="payments" element={<StudentPayments />} />
       </Route>
 
       {/* Root Redirect */}
