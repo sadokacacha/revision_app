@@ -13,10 +13,15 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const response = await axiosClient.get('/users/counts');
-        setCounts(response.data);
+        const response = await axiosClient.get('/users');
+        const users = response.data;
+        setCounts({
+          teachers: users.filter(u => u.role === 'teacher').length,
+          students: users.filter(u => u.role === 'student').length,
+          admins:   users.filter(u => u.role === 'admin').length,
+        });
       } catch (error) {
-        console.error('Error fetching user counts:', error);
+        console.error('Error fetching users:', error);
       }
     };
     fetchCounts();

@@ -41,70 +41,27 @@ class UserController extends Controller
     // GET /api/users/{id}
 public function show($id)
 {
-    $user = User::with('roles')->findOrFail($id);
+    $user = User::with(['roles', 'teacher.user', 'teacher.subjects', 'teacher.classrooms'])->findOrFail($id);
     $role = $user->roles->pluck('name')->first();
 
-    if ($role === 'teacher') {
-        $teacher    = $user->teacher;
-        $hourlyRate = $teacher->hourly_rate;
-        $startOfMonth = Carbon::now()->startOfMonth();
-        $endOfMonth   = Carbon::now()->endOfMonth();
-
-        // load attendances in this month
-        $attendances = Attendance::with('schedule.subject')
-            ->where('teacher_id', $teacher->id)
-            ->whereBetween('date', [$startOfMonth, $endOfMonth])
-            ->get();
-
-        // group by subject_id
-        $bySubject = $attendances->groupBy(function($a){
-            return $a->schedule->subject_id;
-        });
-
-        $modules = [];
-        $total   = 0;
-
-        foreach ($bySubject as $subjectId => $records) {
-            $subject = $records->first()->schedule->subject;
-
-            // sum actual hours taught
-            $attendedHours = $records->sum('hours');
-
-            $due  = $attendedHours * $hourlyRate;
-            $total += $due;
-
-            $modules[] = [
-                'id'             => $subject->id,
-                'name'           => $subject->name,
-                'hours_done'     => round($attendedHours, 2),
-                'price_per_hour' => $hourlyRate,
-                'price_due'      => round($due, 2),
-            ];
-        }
-
-        // fetch any manual payments
-        $payments = Payment::where('user_id', $user->id)
-            ->orderBy('date','desc')
-            ->get(['id','amount','status','date']);
-
-        return response()->json([
-            'id'             => $user->id,
-            'name'           => $user->name,
-            'email'          => $user->email,
-            'role'           => $role,
-            'modules'        => $modules,
-            'total_due'      => round($total, 2),
-            'payments'       => $payments,
-        ]);
-    }
-
-    // non‐teacher
-    return response()->json([
+    $response = [
         'id'    => $user->id,
         'name'  => $user->name,
         'email' => $user->email,
         'role'  => $role,
-    ]);
+    ];
+
+    if ($role === 'teacher' && $user->teacher) {
+        $response['teacher'] = $user->teacher;
+        $response['hourly_rate'] = $user->teacher->hourly_rate;
+        $response['payment_method'] = $user->teacher->payment_method;
+        $response['subjects'] = $user->teacher->subjects;
+        $response['classrooms'] = $user->teacher->classrooms;
+    }
+
+    // (Optional: add your modules/payments logic here if needed)
+
+    return response()->json($response);
 }
     // POST /api/users
     
@@ -233,11 +190,4 @@ public function show($id)
             ], 500);
         }
     }
-
-
-
-
-
-    
-
 }

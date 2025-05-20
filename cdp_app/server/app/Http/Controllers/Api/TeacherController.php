@@ -206,27 +206,31 @@ class TeacherController extends Controller
     public function attendance($id)
     {
         try {
-            $teacher = Teacher::findOrFail($id);
-            
+            $teacher = Teacher::with('user', 'subjects', 'classrooms')->findOrFail($id);
+
             // Get all attendance records for this teacher
             $attendance = Attendance::with(['schedule.subject', 'schedule.classroom'])
                 ->where('teacher_id', $id)
                 ->orderBy('date', 'desc')
                 ->get()
                 ->map(function ($record) {
+                    $schedule = $record->schedule;
                     return [
                         'id' => $record->id,
                         'date' => $record->date,
                         'status' => $record->present ? 'present' : 'absent',
                         'hours' => $record->hours,
-                        'subject' => $record->schedule->subject->name,
-                        'classroom' => $record->schedule->classroom->name,
-                        'start_time' => $record->schedule->start_time,
-                        'end_time' => $record->schedule->end_time
+                        'subject' => ($schedule && $schedule->subject) ? $schedule->subject->name : null,
+                        'classroom' => ($schedule && $schedule->classroom) ? $schedule->classroom->name : null,
+                        'start_time' => $schedule ? $schedule->start_time : null,
+                        'end_time' => $schedule ? $schedule->end_time : null
                     ];
                 });
 
-            return response()->json($attendance);
+            return response()->json([
+                'teacher' => $teacher,
+                'attendance' => $attendance
+            ]);
         } catch (\Exception $e) {
             Log::error("attendance({$id}) failed: " . $e->getMessage());
             return response()->json([
