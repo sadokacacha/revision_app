@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Modal, Form, Button, Row, Col } from "react-bootstrap";
+import { Modal, Form, Button, Row, Col, Card } from "react-bootstrap";
 import axiosClient from "../../../../axios-client";
 
 const UserFormModal = ({ showModal, setShowModal, onUserCreated, availableClassrooms, availableSubjects, initialRole = 'student' }) => {
@@ -12,16 +12,22 @@ const UserFormModal = ({ showModal, setShowModal, onUserCreated, availableClassr
     email: '',
     password: '',
     phone: '',
+    address: '',
     role: initialRole,
     // Teacher specific fields
     ratePerHour: '',
     paymentMethod: 'bank',
+    paymentPlan: 'monthly',
     subjects: [],
     classrooms: [],
     // Student specific fields
     classroom: '',
     paymentStyle: 'monthly',
     paymentPeriod: '9',
+    paymentMethod: 'bank',
+    // Common fields
+    status: 'active',
+    notes: ''
   });
   
   const handleUserFormChange = (e) => {
@@ -53,23 +59,27 @@ const UserFormModal = ({ showModal, setShowModal, onUserCreated, availableClassr
     setLoading(true);
     
     try {
-      console.log("Creating user with role:", userForm.role);
-      
       // Prepare data based on role
       const userData = {
         name: `${userForm.firstName} ${userForm.lastName}`,
         email: userForm.email,
         password: userForm.password,
         phone: userForm.phone,
+        address: userForm.address,
         role: userForm.role,
+        status: userForm.status,
+        notes: userForm.notes
       };
       
       // Add role-specific data
       if (userForm.role === 'teacher') {
-        userData.hourly_rate = parseFloat(userForm.ratePerHour) || 0;
-        userData.payment_method = userForm.paymentMethod;
-        userData.subjects = userForm.subjects;
-        userData.classrooms = userForm.classrooms;
+        userData.teacherData = {
+          hourly_rate: parseFloat(userForm.ratePerHour) || 0,
+          payment_method: userForm.paymentMethod,
+          payment_plan: userForm.paymentPlan,
+          subjects: userForm.subjects,
+          classrooms: userForm.classrooms
+        };
       } else if (userForm.role === 'student') {
         // Calculate fees based on payment style
         const baseMonthlyFee = 300;
@@ -78,23 +88,17 @@ const UserFormModal = ({ showModal, setShowModal, onUserCreated, availableClassr
         
         userData.studentData = {
           classroom: userForm.classroom,
-          paymentStyle: userForm.paymentStyle,
-          paymentPeriod: parseInt(userForm.paymentPeriod) || 9,
-          paymentMethod: userForm.paymentMethod,
-          monthlyFee: baseMonthlyFee,
-          semesterFee: baseSemesterFee,
-          fullYearFee: baseFullYearFee
+          payment_style: userForm.paymentStyle,
+          payment_period: parseInt(userForm.paymentPeriod) || 9,
+          payment_method: userForm.paymentMethod,
+          monthly_fee: baseMonthlyFee,
+          semester_fee: baseSemesterFee,
+          full_year_fee: baseFullYearFee
         };
-        
-        console.log("Student data:", userData.studentData);
       }
-      
-      console.log("Sending user data:", userData);
       
       // Make API call to create user
       const response = await axiosClient.post('/users', userData);
-      
-      console.log("User creation response:", response.data);
       
       // Close modal and reset form
       resetFormAndClose();
@@ -111,13 +115,9 @@ const UserFormModal = ({ showModal, setShowModal, onUserCreated, availableClassr
       console.error('Error creating user:', error);
       
       if (error.response) {
-        console.log("Response error data:", error.response.data);
-        console.log("Response status:", error.response.status);
-        
         if (error.response.data && error.response.data.message) {
           alert(`Failed to create user: ${error.response.data.message}`);
         } else if (error.response.data && error.response.data.errors) {
-          // Handle validation errors
           const errorMessages = Object.values(error.response.data.errors).flat().join('\n');
           alert(`Validation errors:\n${errorMessages}`);
         } else {
@@ -138,14 +138,18 @@ const UserFormModal = ({ showModal, setShowModal, onUserCreated, availableClassr
       email: '',
       password: '',
       phone: '',
+      address: '',
       role: initialRole,
       ratePerHour: '',
       paymentMethod: 'bank',
+      paymentPlan: 'monthly',
       subjects: [],
       classrooms: [],
       classroom: '',
       paymentStyle: 'monthly',
       paymentPeriod: '9',
+      status: 'active',
+      notes: ''
     });
     setShowModal(false);
   };
@@ -163,238 +167,291 @@ const UserFormModal = ({ showModal, setShowModal, onUserCreated, availableClassr
 
       <Form onSubmit={handleSubmitUserForm}>
         <Modal.Body>
-          {/* Role Selection */}
-          <Form.Group controlId="role" className="mb-3">
-            <Form.Label>User Role</Form.Label>
-            <Form.Select 
-              name="role"
-              value={userForm.role} 
-              onChange={handleUserFormChange}
-            >
-              <option value="student">Student</option>
-              <option value="teacher">Teacher</option>
-              <option value="admin">Admin</option>
-            </Form.Select>
-          </Form.Group>
-
-          {/* Basic Information - All User Types */}
-          <Row className="mb-3">
-            <Col>
-              <Form.Group controlId="firstName">
-                <Form.Label>First Name</Form.Label>
-                <Form.Control
-                  type="text"
-                  placeholder="Enter first name"
-                  name="firstName"
-                  value={userForm.firstName}
-                  onChange={handleUserFormChange}
-                  required
-                  autoFocus
-                />
-              </Form.Group>
-            </Col>
-            <Col>
-              <Form.Group controlId="lastName">
-                <Form.Label>Last Name</Form.Label>
-                <Form.Control 
-                  type="text" 
-                  placeholder="Enter last name" 
-                  name="lastName"
-                  value={userForm.lastName}
-                  onChange={handleUserFormChange}
-                  required
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <Form.Group controlId="email" className="mb-3">
-            <Form.Label>Email</Form.Label>
-            <Form.Control 
-              type="email" 
-              placeholder="Enter email" 
-              name="email"
-              value={userForm.email}
-              onChange={handleUserFormChange}
-              required
-            />
-          </Form.Group>
-
-          <Form.Group controlId="password" className="mb-3">
-            <Form.Label>Password</Form.Label>
-            <Form.Control 
-              type="password" 
-              placeholder="Enter password" 
-              name="password"
-              value={userForm.password}
-              onChange={handleUserFormChange}
-              required
-            />
-          </Form.Group>
-
-          <Form.Group controlId="phone" className="mb-3">
-            <Form.Label>Phone</Form.Label>
-            <Form.Control 
-              type="text" 
-              placeholder="Enter phone number"
-              name="phone"
-              value={userForm.phone}
-              onChange={handleUserFormChange}
-            />
-          </Form.Group>
-
-          {/* Teacher-Specific Fields */}
-          {userForm.role === 'teacher' && (
-            <>
-              <hr />
-              <h5>Teacher Information</h5>
+          <Card className="mb-4">
+            <Card.Body>
+              <h5 className="mb-3">Basic Information</h5>
               
+              {/* Role Selection */}
+              <Form.Group controlId="role" className="mb-3">
+                <Form.Label>User Role</Form.Label>
+                <Form.Select 
+                  name="role"
+                  value={userForm.role} 
+                  onChange={handleUserFormChange}
+                >
+                  <option value="student">Student</option>
+                  <option value="teacher">Teacher</option>
+                  <option value="admin">Admin</option>
+                </Form.Select>
+              </Form.Group>
+
+              {/* Basic Information - All User Types */}
               <Row className="mb-3">
                 <Col>
-                  <Form.Group controlId="ratePerHour">
-                    <Form.Label>Rate per Hour ($)</Form.Label>
-                    <Form.Control 
-                      type="number" 
-                      min="0"
-                      step="0.01"
-                      placeholder="Enter hourly rate" 
-                      name="ratePerHour"
-                      value={userForm.ratePerHour}
+                  <Form.Group controlId="firstName">
+                    <Form.Label>First Name</Form.Label>
+                    <Form.Control
+                      type="text"
+                      placeholder="Enter first name"
+                      name="firstName"
+                      value={userForm.firstName}
                       onChange={handleUserFormChange}
                       required
                     />
                   </Form.Group>
                 </Col>
                 <Col>
-                  <Form.Group controlId="paymentMethod">
-                    <Form.Label>Payment Method</Form.Label>
-                    <Form.Select 
-                      name="paymentMethod"
-                      value={userForm.paymentMethod}
+                  <Form.Group controlId="lastName">
+                    <Form.Label>Last Name</Form.Label>
+                    <Form.Control 
+                      type="text" 
+                      placeholder="Enter last name" 
+                      name="lastName"
+                      value={userForm.lastName}
                       onChange={handleUserFormChange}
-                    >
-                      <option value="bank">Bank Transfer</option>
-                      <option value="cash">Cash</option>
-                      <option value="check">Check</option>
-                    </Form.Select>
+                      required
+                    />
                   </Form.Group>
                 </Col>
               </Row>
-              
-              <Row>
-                <Col>
-                  <Form.Group controlId="subjects">
-                    <Form.Label>Subjects to Teach</Form.Label>
-                    <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #ced4da', padding: '10px', borderRadius: '4px' }}>
-                      {availableSubjects.map(subject => (
-                        <Form.Check
-                          key={subject.id}
-                          type="checkbox"
-                          id={`subject-${subject.id}`}
-                          label={subject.name}
-                          name="subjects"
-                          value={subject.id}
-                          checked={userForm.subjects.includes(subject.id)}
-                          onChange={handleUserFormChange}
-                        />
-                      ))}
-                    </div>
-                  </Form.Group>
-                </Col>
-                <Col>
-                  <Form.Group controlId="classrooms">
-                    <Form.Label>Assigned Classrooms</Form.Label>
-                    <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #ced4da', padding: '10px', borderRadius: '4px' }}>
-                      {availableClassrooms.map(classroom => (
-                        <Form.Check
-                          key={classroom.id}
-                          type="checkbox"
-                          id={`classroom-${classroom.id}`}
-                          label={classroom.name}
-                          name="classrooms"
-                          value={classroom.id}
-                          checked={userForm.classrooms.includes(classroom.id)}
-                          onChange={handleUserFormChange}
-                        />
-                      ))}
-                    </div>
-                  </Form.Group>
-                </Col>
-              </Row>
-            </>
-          )}
-          
-          {/* Student-Specific Fields */}
-          {userForm.role === 'student' && (
-            <>
-              <hr />
-              <h5>Student Information</h5>
-              
-              <Form.Group controlId="classroom" className="mb-3">
-                <Form.Label>Assigned Class</Form.Label>
-                <Form.Select 
-                  name="classroom"
-                  value={userForm.classroom}
-                  onChange={handleUserFormChange}
-                  required
-                >
-                  <option value="">Select a classroom</option>
-                  {availableClassrooms.map(classroom => (
-                    <option key={classroom.id} value={classroom.id}>
-                      {classroom.name}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-              
+
               <Row className="mb-3">
                 <Col>
-                  <Form.Group controlId="paymentStyle">
-                    <Form.Label>Payment Style</Form.Label>
-                    <Form.Select 
-                      name="paymentStyle"
-                      value={userForm.paymentStyle}
+                  <Form.Group controlId="email">
+                    <Form.Label>Email</Form.Label>
+                    <Form.Control 
+                      type="email" 
+                      placeholder="Enter email" 
+                      name="email"
+                      value={userForm.email}
                       onChange={handleUserFormChange}
-                    >
-                      <option value="monthly">Monthly</option>
-                      <option value="semester">Semester</option>
-                      <option value="full">Full Year</option>
-                    </Form.Select>
+                      required
+                    />
                   </Form.Group>
                 </Col>
+                <Col>
+                  <Form.Group controlId="phone">
+                    <Form.Label>Phone</Form.Label>
+                    <Form.Control 
+                      type="text" 
+                      placeholder="Enter phone number"
+                      name="phone"
+                      value={userForm.phone}
+                      onChange={handleUserFormChange}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <Form.Group controlId="address" className="mb-3">
+                <Form.Label>Address</Form.Label>
+                <Form.Control 
+                  type="text" 
+                  placeholder="Enter address"
+                  name="address"
+                  value={userForm.address}
+                  onChange={handleUserFormChange}
+                />
+              </Form.Group>
+
+              <Form.Group controlId="password" className="mb-3">
+                <Form.Label>Password</Form.Label>
+                <Form.Control 
+                  type="password" 
+                  placeholder="Enter password" 
+                  name="password"
+                  value={userForm.password}
+                  onChange={handleUserFormChange}
+                  required
+                />
+              </Form.Group>
+
+              <Form.Group controlId="status" className="mb-3">
+                <Form.Label>Status</Form.Label>
+                <Form.Select
+                  name="status"
+                  value={userForm.status}
+                  onChange={handleUserFormChange}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="suspended">Suspended</option>
+                </Form.Select>
+              </Form.Group>
+
+              <Form.Group controlId="notes" className="mb-3">
+                <Form.Label>Notes</Form.Label>
+                <Form.Control 
+                  as="textarea" 
+                  rows={3}
+                  placeholder="Enter any additional notes"
+                  name="notes"
+                  value={userForm.notes}
+                  onChange={handleUserFormChange}
+                />
+              </Form.Group>
+            </Card.Body>
+          </Card>
+
+          {/* Teacher-Specific Fields */}
+          {userForm.role === 'teacher' && (
+            <Card className="mb-4">
+              <Card.Body>
+                <h5 className="mb-3">Teacher Information</h5>
                 
-                {userForm.paymentStyle === 'monthly' && (
+                <Row className="mb-3">
                   <Col>
-                    <Form.Group controlId="paymentPeriod">
-                      <Form.Label>Payment Period (Months)</Form.Label>
+                    <Form.Group controlId="ratePerHour">
+                      <Form.Label>Rate per Hour ($)</Form.Label>
                       <Form.Control
                         type="number"
-                        min="1"
-                        max="12"
-                        name="paymentPeriod"
-                        value={userForm.paymentPeriod}
+                        step="0.01"
+                        name="ratePerHour"
+                        value={userForm.ratePerHour}
                         onChange={handleUserFormChange}
+                        required
                       />
                     </Form.Group>
                   </Col>
-                )}
+                  <Col>
+                    <Form.Group controlId="paymentPlan">
+                      <Form.Label>Payment Plan</Form.Label>
+                      <Form.Select
+                        name="paymentPlan"
+                        value={userForm.paymentPlan}
+                        onChange={handleUserFormChange}
+                      >
+                        <option value="monthly">Monthly</option>
+                        <option value="semester">Semester</option>
+                        <option value="yearly">Yearly</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                </Row>
+
+                <Form.Group controlId="paymentMethod" className="mb-3">
+                  <Form.Label>Payment Method</Form.Label>
+                  <Form.Select
+                    name="paymentMethod"
+                    value={userForm.paymentMethod}
+                    onChange={handleUserFormChange}
+                  >
+                    <option value="bank">Bank Transfer</option>
+                    <option value="cash">Cash</option>
+                    <option value="check">Check</option>
+                    <option value="other">Other</option>
+                  </Form.Select>
+                </Form.Group>
+
+                <Form.Group controlId="subjects" className="mb-3">
+                  <Form.Label>Subjects</Form.Label>
+                  <div className="border rounded p-2">
+                    {availableSubjects.map(subject => (
+                      <Form.Check
+                        key={subject.id}
+                        type="checkbox"
+                        id={`subject-${subject.id}`}
+                        label={subject.name}
+                        name="subjects"
+                        value={subject.id}
+                        checked={userForm.subjects.includes(subject.id)}
+                        onChange={handleUserFormChange}
+                      />
+                    ))}
+                  </div>
+                </Form.Group>
+
+                <Form.Group controlId="classrooms" className="mb-3">
+                  <Form.Label>Assigned Classrooms</Form.Label>
+                  <div className="border rounded p-2">
+                    {availableClassrooms.map(classroom => (
+                      <Form.Check
+                        key={classroom.id}
+                        type="checkbox"
+                        id={`classroom-${classroom.id}`}
+                        label={classroom.name}
+                        name="classrooms"
+                        value={classroom.id}
+                        checked={userForm.classrooms.includes(classroom.id)}
+                        onChange={handleUserFormChange}
+                      />
+                    ))}
+                  </div>
+                </Form.Group>
+              </Card.Body>
+            </Card>
+          )}
+
+          {/* Student-Specific Fields */}
+          {userForm.role === 'student' && (
+            <Card className="mb-4">
+              <Card.Body>
+                <h5 className="mb-3">Student Information</h5>
                 
-                <Col>
-                  <Form.Group controlId="paymentMethod">
-                    <Form.Label>Payment Method</Form.Label>
-                    <Form.Select 
-                      name="paymentMethod"
-                      value={userForm.paymentMethod}
+                <Form.Group controlId="classroom" className="mb-3">
+                  <Form.Label>Classroom</Form.Label>
+                  <Form.Select
+                    name="classroom"
+                    value={userForm.classroom}
+                    onChange={handleUserFormChange}
+                    required
+                  >
+                    <option value="">Select a classroom</option>
+                    {availableClassrooms.map(classroom => (
+                      <option key={classroom.id} value={classroom.id}>
+                        {classroom.name}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+
+                <Row className="mb-3">
+                  <Col>
+                    <Form.Group controlId="paymentStyle">
+                      <Form.Label>Payment Style</Form.Label>
+                      <Form.Select
+                        name="paymentStyle"
+                        value={userForm.paymentStyle}
+                        onChange={handleUserFormChange}
+                      >
+                        <option value="monthly">Monthly</option>
+                        <option value="semester">Semester</option>
+                        <option value="full">Full Year</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col>
+                    <Form.Group controlId="paymentMethod">
+                      <Form.Label>Payment Method</Form.Label>
+                      <Form.Select
+                        name="paymentMethod"
+                        value={userForm.paymentMethod}
+                        onChange={handleUserFormChange}
+                      >
+                        <option value="bank">Bank Transfer</option>
+                        <option value="cash">Cash</option>
+                        <option value="check">Check</option>
+                        <option value="other">Other</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                </Row>
+
+                {userForm.paymentStyle === 'monthly' && (
+                  <Form.Group controlId="paymentPeriod" className="mb-3">
+                    <Form.Label>Payment Period (Months)</Form.Label>
+                    <Form.Control
+                      type="number"
+                      min="1"
+                      max="12"
+                      name="paymentPeriod"
+                      value={userForm.paymentPeriod}
                       onChange={handleUserFormChange}
-                    >
-                      <option value="bank">Bank Transfer</option>
-                      <option value="cash">Cash</option>
-                      <option value="check">Check</option>
-                    </Form.Select>
+                    />
                   </Form.Group>
-                </Col>
-              </Row>
-            </>
+                )}
+              </Card.Body>
+            </Card>
           )}
         </Modal.Body>
 
@@ -402,12 +459,8 @@ const UserFormModal = ({ showModal, setShowModal, onUserCreated, availableClassr
           <Button variant="secondary" onClick={resetFormAndClose}>
             Cancel
           </Button>
-          <Button 
-            variant="primary" 
-            type="submit" 
-            disabled={loading}
-          >
-            {loading ? 'Saving...' : 'Save User'}
+          <Button variant="primary" type="submit" disabled={loading}>
+            {loading ? 'Creating...' : 'Create User'}
           </Button>
         </Modal.Footer>
       </Form>

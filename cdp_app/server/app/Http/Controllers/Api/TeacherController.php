@@ -157,48 +157,48 @@ class TeacherController extends Controller
     {
         try {
             $teacher = Teacher::findOrFail($id);
-            $rate    = $teacher->hourly_rate;
+            $rate = $teacher->hourly_rate;
 
-            // 1) all subjects this teacher has
+            // Get all subjects this teacher teaches
             $subjects = DB::table('subject_teacher')
                 ->join('subjects', 'subject_teacher.subject_id', 'subjects.id')
                 ->where('subject_teacher.teacher_id', $id)
-                ->select('subjects.id','subjects.name')
+                ->select('subjects.id', 'subjects.name')
                 ->get();
 
-            // 2) total attended hours PER subject
-            $records = DB::table('schedules')
-                ->join('attendances', 'schedules.id', '=', 'attendances.schedule_id')
+            // Calculate hours from attendance records
+            $hoursBySubject = DB::table('attendances')
+                ->join('schedules', 'attendances.schedule_id', '=', 'schedules.id')
                 ->where('attendances.teacher_id', $id)
                 ->where('attendances.present', true)
+                ->whereNotNull('attendances.hours')
                 ->groupBy('schedules.subject_id')
-                ->select([
+                ->select(
                     'schedules.subject_id',
-                    DB::raw('SUM(attendances.hours) as hours'),
-                ])
-                ->get();
-            
-            // map to [ subject_id => hours ]
-            $hoursBySub = $records->pluck('hours', 'subject_id');
+                    DB::raw('SUM(attendances.hours) as total_hours')
+                )
+                ->get()
+                ->pluck('total_hours', 'subject_id');
 
-            // build final output
-            $out = [];
-            foreach ($subjects as $sub) {
-                $hrs = $hoursBySub->get($sub->id, 0);
-                $out[] = [
-                    'subject'     => $sub->name,
-                    'hours'       => (float)$hrs,
+            // Build the response
+            $result = [];
+            foreach ($subjects as $subject) {
+                $hours = $hoursBySubject->get($subject->id, 0);
+                $result[] = [
+                    'subject' => $subject->name,
+                    'hours' => (float)$hours,
                     'ratePerHour' => (float)$rate,
+                    'totalAmount' => (float)($hours * $rate)
                 ];
             }
 
-            return response()->json($out, 200);
+            return response()->json($result);
 
-        } catch (\Throwable $e) {
-            Log::error("hoursBySubject({$id}) failed: ".$e->getMessage());
+        } catch (\Exception $e) {
+            Log::error("Error in hoursBySubject for teacher {$id}: " . $e->getMessage());
             return response()->json([
-                'error'   => 'Could not calculate teaching hours',
-                'message' => $e->getMessage(),
+                'error' => 'Failed to calculate teaching hours',
+                'message' => $e->getMessage()
             ], 500);
         }
     }

@@ -22,14 +22,25 @@ export default function UserDetails() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [availableClassrooms, setAvailableClassrooms] = useState([]);
+  const [availableSubjects, setAvailableSubjects] = useState([]);
   
   // Fetch user data when component mounts or when id changes
   useEffect(() => {
-    const fetchUserData = async () => {
+    const fetchData = async () => {
       setLoading(true);
       setError(null);
       
       try {
+        // Fetch classrooms and subjects
+        const [classroomsResponse, subjectsResponse] = await Promise.all([
+          axiosClient.get('/classrooms'),
+          axiosClient.get('/subjects')
+        ]);
+        
+        setAvailableClassrooms(classroomsResponse.data);
+        setAvailableSubjects(subjectsResponse.data);
+        
         // Make API call to get user details
         const response = await axiosClient.get(`/users/${id}`);
         
@@ -54,7 +65,7 @@ export default function UserDetails() {
           // Fetch teacher attendance if user is a teacher
           if (response.data.role === 'teacher') {
             try {
-              const teacherProfileId = response.data.teacher?.id || id;
+              const teacherProfileId = response.data.teacher?.id;
               if (teacherProfileId) {
                 const attendanceResponse = await axiosClient.get(`/teachers/${teacherProfileId}/attendance`);
                 if (Array.isArray(attendanceResponse.data)) {
@@ -66,8 +77,8 @@ export default function UserDetails() {
                 setAttendance([]);
               }
             } catch (attendanceError) {
+              console.error('Error fetching attendance:', attendanceError);
               setAttendance([]);
-              // Optionally show a message: "No attendance data available"
             }
           }
         } else {
@@ -75,7 +86,7 @@ export default function UserDetails() {
           setError('Invalid user data received from server.');
         }
       } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error('Error fetching data:', error);
         setError('Failed to load user data. Please try again.');
       } finally {
         setLoading(false);
@@ -83,7 +94,7 @@ export default function UserDetails() {
     };
     
     if (id) {
-      fetchUserData();
+      fetchData();
     }
   }, [id]);
   
@@ -91,9 +102,14 @@ export default function UserDetails() {
   const calculateTeacherPayments = () => {
     if (!user || user.role !== 'teacher' || !attendance.length) return null;
     
-    const presentDays = attendance.filter(record => record.status === 'present');
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+    const presentDays = attendance.filter(record => 
+      record.status === 'present' && 
+      record.date.startsWith(currentMonth)
+    );
+    
     const totalHours = presentDays.reduce((sum, day) => sum + (day.hours || 8), 0);
-    const totalPayment = totalHours * (user.ratePerHour || 0);
+    const totalPayment = totalHours * (user.ratePerHour || user.hourly_rate || 0);
     
     return {
       totalHours,
@@ -122,23 +138,76 @@ export default function UserDetails() {
   // Handle teacher payment
   const handleTeacherPayment = async () => {
     try {
+      const teacherPayments = calculateTeacherPayments();
+      if (!teacherPayments || teacherPayments.totalHours === 0) {
+        alert('No hours to pay for this month');
+        return;
+      }
+
       const paymentData = {
         userId: id,
-        amount: calculateTeacherPayments().totalPayment,
+        amount: teacherPayments.totalPayment,
         date: new Date().toISOString().split('T')[0],
         status: 'paid',
-        method: 'bank',
+        method: user.paymentMethod || user.payment_method || 'bank',
         type: 'salary',
-        hours: calculateTeacherPayments().totalHours
+        hours: teacherPayments.totalHours,
+        description: `Salary payment for ${teacherPayments.totalHours} hours`,
+        period: new Date().toISOString().slice(0, 7) // YYYY-MM format
       };
       
       const response = await axiosClient.post(`/users/${id}/payments`, paymentData);
-      handlePaymentAdded(response.data);
-      alert('Teacher payment recorded successfully!');
+      if (response.data) {
+        handlePaymentAdded(response.data);
+        alert('Teacher payment recorded successfully!');
+      }
     } catch (error) {
       console.error('Error recording teacher payment:', error);
-      alert('Failed to record teacher payment');
+      alert(error.response?.data?.message || 'Failed to record teacher payment');
     }
+  };
+
+  // Handle student payment
+  const handleStudentPayment = async (paymentData) => {
+    try {
+      const response = await axiosClient.post(`/users/${id}/payments`, {
+        ...paymentData,
+        userId: id,
+        type: 'fee',
+        status: 'paid',
+        period: paymentData.period || new Date().toISOString().slice(0, 7) // YYYY-MM format
+      });
+      
+      if (response.data) {
+        handlePaymentAdded(response.data);
+        alert('Student payment recorded successfully!');
+      }
+    } catch (error) {
+      console.error('Error recording student payment:', error);
+      alert(error.response?.data?.message || 'Failed to record student payment');
+    }
+  };
+
+  // Calculate student's payment summary
+  const calculateStudentPayments = () => {
+    if (!user || user.role !== 'student') return null;
+
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+    const monthlyPayments = payments.filter(p => 
+      p.status === 'paid' && 
+      p.period === currentMonth
+    );
+
+    const totalPaid = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalDue = user.total_due || 0;
+    const remaining = totalDue - totalPaid;
+
+    return {
+      totalPaid,
+      totalDue,
+      remaining,
+      monthlyPayments
+    };
   };
   
   if (loading) {
@@ -165,7 +234,6 @@ export default function UserDetails() {
   }
 
   const teacherPayments = calculateTeacherPayments();
-
   const today = new Date().toISOString().split('T')[0];
   const todayAttendance = attendance.find(a => a.date === today);
 
@@ -188,11 +256,29 @@ export default function UserDetails() {
           />
           
           {user.role === 'student' && (
-            <div className="mt-3">
-              <Button variant="primary" size="sm" className="w-100" onClick={() => setShowPaymentModal(true)}>
-                Record Payment
-              </Button>
-            </div>
+            <Card className="mt-3">
+              <Card.Body>
+                <h6>Payment Summary</h6>
+                {(() => {
+                  const summary = calculateStudentPayments();
+                  return (
+                    <>
+                      <p className="mb-1">Total Due: ${summary.totalDue}</p>
+                      <p className="mb-1">Total Paid: ${summary.totalPaid}</p>
+                      <p className="mb-3">Remaining: ${summary.remaining}</p>
+                      <Button 
+                        variant="primary" 
+                        size="sm" 
+                        className="w-100"
+                        onClick={() => setShowPaymentModal(true)}
+                      >
+                        Record Payment
+                      </Button>
+                    </>
+                  );
+                })()}
+              </Card.Body>
+            </Card>
           )}
 
           {user.role === 'teacher' && teacherPayments && (
@@ -201,12 +287,14 @@ export default function UserDetails() {
                 <h6>This Month's Summary</h6>
                 <p className="mb-1">Total Hours: {teacherPayments.totalHours}</p>
                 <p className="mb-1">Present Days: {teacherPayments.presentDays}</p>
+                <p className="mb-1">Rate per Hour: ${user.ratePerHour || user.hourly_rate || 0}</p>
                 <p className="mb-3">Total Payment: ${teacherPayments.totalPayment}</p>
                 <Button 
                   variant="success" 
                   size="sm" 
                   className="w-100"
                   onClick={handleTeacherPayment}
+                  disabled={teacherPayments.totalHours === 0}
                 >
                   Record Payment
                 </Button>
@@ -226,18 +314,20 @@ export default function UserDetails() {
                       <h5 className="mb-3">Teaching Information</h5>
                       <Row>
                         <Col md={6}>
-                          <p><strong>Subjects:</strong> {user.modules && user.modules.length > 0 ? user.modules.map(m => m.name).join(", ") : "Not assigned"}</p>
-                          <p><strong>Classes:</strong> {user.classrooms ? (Array.isArray(user.classrooms) ? user.classrooms.join(", ") : user.classrooms) : "Not assigned"}</p>
+                          <p><strong>Subjects:</strong> {user.subjects && user.subjects.length > 0 ? user.subjects.map(s => s.name).join(", ") : "Not assigned"}</p>
+                          <p><strong>Classes:</strong> {user.classrooms && user.classrooms.length > 0 ? user.classrooms.map(c => c.name).join(", ") : "Not assigned"}</p>
                           <p><strong>Rate per Hour:</strong> ${user.hourly_rate || user.ratePerHour || 0}/hr</p>
-                          <p><strong>Payment Method:</strong> {user.payment_method || "Not set"}</p>
+                          <p><strong>Payment Method:</strong> {user.payment_method || user.paymentMethod || "Not set"}</p>
+                          <p><strong>Payment Plan:</strong> {user.payment_plan || user.paymentPlan || "Not set"}</p>
                         </Col>
                         <Col md={6}>
+                          <p><strong>Status:</strong> <Badge bg={user.status === 'active' ? 'success' : user.status === 'inactive' ? 'warning' : 'danger'}>{user.status}</Badge></p>
                           <p><strong>Total Due This Month:</strong> ${user.total_due || 0}</p>
                           <p><strong>Modules Taught:</strong></p>
                           <ul>
-                            {user.modules && user.modules.length > 0 ? user.modules.map(m => (
-                              <li key={m.id}>
-                                {m.name}: {m.hours_done}h x ${m.price_per_hour}/hr = ${m.price_due}
+                            {user.subjects && user.subjects.length > 0 ? user.subjects.map(s => (
+                              <li key={s.id}>
+                                {s.name}: {s.hours_done}h x ${s.price_per_hour}/hr = ${s.price_due}
                               </li>
                             )) : <li>No modules</li>}
                           </ul>
@@ -245,128 +335,150 @@ export default function UserDetails() {
                       </Row>
                       <hr className="my-4" />
                       <h5 className="mb-3">Payment History</h5>
-                      {user.payments && user.payments.length > 0 ? (
+                      {payments && payments.length > 0 ? (
                         <Table responsive bordered hover>
                           <thead className="table-light">
                             <tr>
                               <th>Date</th>
                               <th>Amount</th>
+                              <th>Method</th>
                               <th>Status</th>
+                              <th>Hours</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {user.payments.map((p) => (
-                              <tr key={p.id}>
-                                <td>{new Date(p.date).toLocaleDateString()}</td>
-                                <td>${p.amount}</td>
-                                <td>{p.status}</td>
+                            {payments.map(payment => (
+                              <tr key={payment.id}>
+                                <td>{new Date(payment.date).toLocaleDateString()}</td>
+                                <td>${payment.amount}</td>
+                                <td>{payment.method}</td>
+                                <td>
+                                  <Badge bg={payment.status === 'paid' ? 'success' : 'warning'}>
+                                    {payment.status}
+                                  </Badge>
+                                </td>
+                                <td>{payment.hours || '-'}</td>
                               </tr>
                             ))}
                           </tbody>
                         </Table>
                       ) : (
-                        <p className="text-muted">No payment records found</p>
+                        <p>No payment history available.</p>
                       )}
                     </div>
                   )}
-                  
+
                   {user.role === 'student' && (
                     <div>
                       <h5 className="mb-3">Student Information</h5>
                       <Row>
                         <Col md={6}>
-                          <p><strong>Class:</strong> {user.classroom || 'Not assigned'}</p>
-                          <p><strong>Parents:</strong> {user.parents || 'Not provided'}</p>
-                          <p><strong>Payment Style:</strong> {user.payment_style || user.paymentStyle || 'monthly'}</p>
-                          <p><strong>Payment Method:</strong> {user.payment_method || user.paymentMethod || 'bank'}</p>
+                          <p><strong>Classroom:</strong> {user.classroom?.name || "Not assigned"}</p>
+                          <p><strong>Payment Style:</strong> {user.payment_style || user.paymentStyle || "Not set"}</p>
+                          <p><strong>Payment Method:</strong> {user.payment_method || user.paymentMethod || "Not set"}</p>
+                          <p><strong>Status:</strong> <Badge bg={user.status === 'active' ? 'success' : user.status === 'inactive' ? 'warning' : 'danger'}>{user.status}</Badge></p>
                         </Col>
                         <Col md={6}>
-                          <p><strong>Enrolled Date:</strong> {user.enrollmentDate || 'Not provided'}</p>
-                          <p><strong>Monthly Fee:</strong> ${user.monthlyFee || 0}</p>
-                          <p><strong>Semester Fee:</strong> ${user.semesterFee || 0}</p>
-                          <p><strong>Full Year Fee:</strong> ${user.fullYearFee || 0}</p>
+                          <p><strong>Total Due:</strong> ${user.total_due || 0}</p>
+                          <p><strong>Next Payment Date:</strong> {user.next_payment_date ? new Date(user.next_payment_date).toLocaleDateString() : "Not set"}</p>
+                          <p><strong>Payment Period:</strong> {user.payment_period || user.paymentPeriod || "Not set"} months</p>
                         </Col>
                       </Row>
                       <hr className="my-4" />
                       <h5 className="mb-3">Payment History</h5>
-                      {Array.isArray(payments) && payments.length > 0 ? (
+                      {payments && payments.length > 0 ? (
                         <Table responsive bordered hover>
                           <thead className="table-light">
                             <tr>
                               <th>Date</th>
                               <th>Amount</th>
+                              <th>Method</th>
                               <th>Status</th>
+                              <th>Period</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {payments.map((p) => (
-                              <tr key={p.id}>
-                                <td>{new Date(p.date).toLocaleDateString()}</td>
-                                <td>${p.amount}</td>
-                                <td>{p.status}</td>
+                            {payments.map(payment => (
+                              <tr key={payment.id}>
+                                <td>{new Date(payment.date).toLocaleDateString()}</td>
+                                <td>${payment.amount}</td>
+                                <td>{payment.method}</td>
+                                <td>
+                                  <Badge bg={payment.status === 'paid' ? 'success' : 'warning'}>
+                                    {payment.status}
+                                  </Badge>
+                                </td>
+                                <td>{payment.period || '-'}</td>
                               </tr>
                             ))}
                           </tbody>
                         </Table>
                       ) : (
-                        <p className="text-muted">No payment records found</p>
+                        <p>No payment history available.</p>
                       )}
                     </div>
                   )}
-                  
+
                   {user.role === 'admin' && (
                     <div>
                       <h5 className="mb-3">Admin Information</h5>
-                      <p><strong>Access Level:</strong> {user.accessLevel || 'Standard'}</p>
-                      <p><strong>Permissions:</strong> {user.permissions || 'Default permissions'}</p>
+                      <Row>
+                        <Col md={6}>
+                          <p><strong>Status:</strong> <Badge bg={user.status === 'active' ? 'success' : user.status === 'inactive' ? 'warning' : 'danger'}>{user.status}</Badge></p>
+                          <p><strong>Last Login:</strong> {user.last_login ? new Date(user.last_login).toLocaleString() : "Never"}</p>
+                        </Col>
+                        <Col md={6}>
+                          <p><strong>Created At:</strong> {new Date(user.created_at).toLocaleString()}</p>
+                          <p><strong>Updated At:</strong> {new Date(user.updated_at).toLocaleString()}</p>
+                        </Col>
+                      </Row>
                     </div>
                   )}
                 </Tab>
-                
-                {/* Payment History Tab */}
-                <Tab eventKey="payments" title="Payment History">
-                  {Array.isArray(payments) && payments.length > 0 ? (
-                    <PaymentsList payments={payments} user={user} />
-                  ) : (
-                    <div className="text-center py-3">
-                      <p className="text-muted">No payment records found</p>
-                      {user.role === 'student' && (
-                        <Button variant="primary" onClick={() => setShowPaymentModal(true)}>
-                          Record First Payment
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </Tab>
+
+                {/* Schedule Tab - Only for Teachers */}
+                {user.role === 'teacher' && (
+                  <Tab eventKey="schedule" title="Schedule">
+                    <TeacherScheduleView teacherId={user.id} />
+                  </Tab>
+                )}
+
+                {/* Hours by Subject Tab - Only for Teachers */}
+                {user.role === 'teacher' && (
+                  <Tab eventKey="hours" title="Hours by Subject">
+                    <TeacherHoursBySubject teacherId={user.teacher?.id} />
+                  </Tab>
+                )}
               </Tabs>
             </Card.Body>
           </Card>
         </Col>
       </Row>
-      
-      {/* Payment Form Modal */}
-      <PaymentFormModal
-        showModal={showPaymentModal}
-        setShowModal={setShowPaymentModal}
-        user={user}
-        onPaymentAdded={handlePaymentAdded}
-      />
-      
+
       {/* Edit User Modal */}
       <EditUserModal
-        key={`edit-user-${user.id}`}
         showModal={showEditModal}
         setShowModal={setShowEditModal}
         user={user}
         onUserUpdated={handleUserUpdated}
+        availableClassrooms={availableClassrooms}
+        availableSubjects={availableSubjects}
       />
-      
+
       {/* Delete User Modal */}
       <DeleteUserModal
         showModal={showDeleteModal}
         setShowModal={setShowDeleteModal}
         user={user}
         onUserDeleted={handleUserDeleted}
+      />
+
+      {/* Payment Form Modal */}
+      <PaymentFormModal
+        showModal={showPaymentModal}
+        setShowModal={setShowPaymentModal}
+        user={user}
+        onPaymentAdded={handleStudentPayment}
       />
     </div>
   );

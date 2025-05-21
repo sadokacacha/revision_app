@@ -1,65 +1,87 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Spinner, Alert } from 'react-bootstrap';
+import { Table, Card, Alert, Spinner } from 'react-bootstrap';
 import axiosClient from '../../../../axios-client';
 
-export default function TeacherHoursBySubject({ teacherId }) {
-  const [data, setData]     = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState(null);
+const TeacherHoursBySubject = ({ teacherId }) => {
+  const [hours, setHours] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!teacherId) return;
-    setLoading(true);
-    setError(null);
-
-    axiosClient.get(`/teachers/${teacherId}/hours-by-subject`)
-      .then(out => {
-        setData(Array.isArray(out) ? out : []);
-      })
-      .catch(err => {
+    const fetchHours = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await axiosClient.get(`/teachers/${teacherId}/hours-by-subject`);
+        if (response.data) {
+          setHours(response.data);
+        }
+      } catch (err) {
         console.error('Error fetching hours:', err);
-        setError('Could not load teaching hours.');
-      })
-      .finally(() => setLoading(false));
+        setError(err.response?.data?.message || 'Failed to load teacher hours');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (teacherId) {
+      fetchHours();
+    }
   }, [teacherId]);
 
-  if (loading) return (
-    <div className="text-center py-3"><Spinner animation="border" /></div>
-  );
-  if (error)   return <Alert variant="danger">{error}</Alert>;
-  if (!data.length) return (
-    <div className="text-center text-muted py-3">No hours recorded.</div>
-  );
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center p-4">
+        <Spinner animation="border" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </Spinner>
+      </div>
+    );
+  }
 
-  const totalHours   = data.reduce((sum, r) => sum + r.hours, 0);
-  const totalEarned  = data.reduce((sum, r) => sum + r.hours * r.ratePerHour, 0);
+  if (error) {
+    return (
+      <Alert variant="danger" className="m-3">
+        {error}
+      </Alert>
+    );
+  }
+
+  if (!hours.length) {
+    return (
+      <Alert variant="info" className="m-3">
+        No hours recorded for this teacher.
+      </Alert>
+    );
+  }
 
   return (
-    <Table bordered hover size="sm">
-      <thead>
-        <tr>
-          <th>Subject</th>
-          <th>Hours</th>
-          <th>Rate</th>
-          <th>Earnings</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data.map((r,i) => (
-          <tr key={i}>
-            <td>{r.subject}</td>
-            <td>{r.hours}</td>
-            <td>${r.ratePerHour.toFixed(2)}</td>
-            <td>${(r.hours * r.ratePerHour).toFixed(2)}</td>
-          </tr>
-        ))}
-        <tr className="table-active">
-          <td><strong>Total</strong></td>
-          <td><strong>{totalHours}</strong></td>
-          <td></td>
-          <td><strong>${totalEarned.toFixed(2)}</strong></td>
-        </tr>
-      </tbody>
-    </Table>
+    <Card>
+      <Card.Body>
+        <h5 className="mb-3">Hours by Subject</h5>
+        <Table responsive hover>
+          <thead className="table-light">
+            <tr>
+              <th>Subject</th>
+              <th>Hours</th>
+              <th>Rate/Hour</th>
+              <th>Total Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {hours.map((record) => (
+              <tr key={record.subject}>
+                <td>{record.subject}</td>
+                <td>{record.hours}</td>
+                <td>${record.ratePerHour}</td>
+                <td>${record.totalAmount}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </Card.Body>
+    </Card>
   );
-}
+};
+
+export default TeacherHoursBySubject;
