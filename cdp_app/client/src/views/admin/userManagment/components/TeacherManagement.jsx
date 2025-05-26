@@ -29,7 +29,6 @@ const TeacherManagement = ({ search, setSearch, loadingUsers, showUserForm, onTe
     navigate(`/admin/users/${teacher.user.id}`);
   };
 
-  // Filter by search
   const filteredTeachers = teachers.filter((teacher) =>
     teacher.user?.name?.toLowerCase().includes(search.toLowerCase())
   );
@@ -65,8 +64,7 @@ const TeacherManagement = ({ search, setSearch, loadingUsers, showUserForm, onTe
               <tr>
                 <th>Name</th>
                 <th>Email</th>
-                <th>Subjects</th>
-                <th>Classes</th>
+                <th>Classroom & Subject Assignments</th>
                 <th>Rate / Hour</th>
                 <th>Payment Method</th>
                 <th>Actions</th>
@@ -79,14 +77,21 @@ const TeacherManagement = ({ search, setSearch, loadingUsers, showUserForm, onTe
                     <td>{teacher.user?.name}</td>
                     <td>{teacher.user?.email}</td>
                     <td>
-                      {teacher.subjects && teacher.subjects.length > 0
-                        ? teacher.subjects.map((s) => s.name).join(", ")
-                        : "Not assigned"}
-                    </td>
-                    <td>
-                      {teacher.classrooms && teacher.classrooms.length > 0
-                        ? teacher.classrooms.map((c) => c.name).join(", ")
-                        : "Not assigned"}
+                      {teacher.classroom_subjects?.length > 0 ? (
+                        teacher.classroom_subjects
+                          .map((entry) => {
+                            const subject = teacher.subjects.find((s) => s.id === entry.subject_id);
+                            const classroom = teacher.classrooms.find((c) => c.id === entry.classroom_id);
+                            if (subject && classroom) {
+                              return `${subject.name} (${classroom.name})`;
+                            }
+                            return null;
+                          })
+                          .filter(Boolean)
+                          .join(", ")
+                      ) : (
+                        "Not assigned"
+                      )}
                     </td>
                     <td>${teacher.hourly_rate || 0}/hr</td>
                     <td>{teacher.payment_method || "Not set"}</td>
@@ -103,7 +108,7 @@ const TeacherManagement = ({ search, setSearch, loadingUsers, showUserForm, onTe
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="text-center">
+                  <td colSpan="6" className="text-center">
                     No teachers found
                   </td>
                 </tr>
@@ -111,11 +116,11 @@ const TeacherManagement = ({ search, setSearch, loadingUsers, showUserForm, onTe
             </tbody>
           </Table>
         )}
-        
+
         <TodaysTeacherList />
       </Card.Body>
     </Card>
   );
 };
 
-export default TeacherManagement; 
+export default TeacherManagement;
