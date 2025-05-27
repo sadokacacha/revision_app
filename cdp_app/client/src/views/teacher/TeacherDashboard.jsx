@@ -2,16 +2,6 @@ import React from 'react';
 import { Card, Table, Form, Container, Row, Col, Button } from 'react-bootstrap';
 import { Calendar, CreditCard, Download } from 'lucide-react';
 
-// Payments interface outside the component
-// interface Payment {
-//   period: string;
-//   amount: number;
-//   status: 'Paid' | 'Pending';
-//   date: string;
-//   method: string;
-//   classes?: string[];
-// }
-
 const payments = [
   { period: 'November 2023', amount: 1850.0, status: 'Paid', date: '2023-11-01', method: 'Direct Deposit' },
   { period: 'October 2023', amount: 1850.0, status: 'Paid', date: '2023-10-01', method: 'Direct Deposit' },

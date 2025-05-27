@@ -39,6 +39,7 @@ class UserController extends Controller
 
 
     // GET /api/users/{id}
+
 public function show($id)
 {
     $user = User::with(['roles', 'teacher.user', 'teacher.subjects', 'teacher.classrooms'])->findOrFail($id);
@@ -59,11 +60,12 @@ public function show($id)
         $response['classrooms'] = $user->teacher->classrooms;
     }
 
-    // (Optional: add your modules/payments logic here if needed)
 
     return response()->json($response);
 }
     // POST /api/users
+
+
     public function store(Request $request)
 {
     $data = $request->validate([

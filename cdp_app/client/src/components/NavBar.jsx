@@ -60,12 +60,6 @@ const NavBar = () => {
               </button>
             </Link>
 
-            <Link to={`/${user.role}/schedule`}>
-              <button className="btn btn-blue rounded-3" type="button">
-                <i className="bi bi-calendar-day"></i> Schedule
-              </button>
-            </Link>
-
             <Link to={`/${user.role}/profile`}>
               <button className="btn btn-blue rounded-3" type="button">
                 <i className="bi bi-person-circle"></i> Profile
@@ -81,11 +75,22 @@ const NavBar = () => {
             )}
             
             {user.role === 'admin' && (
+              <>
+              
+              
               <Link to={`/${user.role}/classrooms`}>
                 <button className="btn btn-blue rounded-3" type="button">
                   <i className="bi bi-clipboard2-plus"></i> Modules
                 </button>
               </Link>
+
+            <Link to={`/${user.role}/schedule`}>
+              <button className="btn btn-blue rounded-3" type="button">
+                <i className="bi bi-calendar-day"></i> Schedule
+              </button>
+            </Link>
+              </>
+
             )}
 
             <button 
