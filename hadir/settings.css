@@ -1,0 +1,55 @@
+body {
+    background-color: #f8f9fa;
+  }
+  .sidebar {
+    background-color: #0b0a3e;
+    color: white;
+    height: 100vh;
+    position: fixed;
+    width: 240px;
+    padding-top: 20px;
+  }
+  .sidebar .nav-link {
+    color: white;
+    margin-bottom: 10px;
+  }
+  .sidebar .nav-link.active,
+  .sidebar .nav-link:hover {
+    background-color: #c9a34b;
+    border-radius: 10px;
+  }
+  .main-content {
+    margin-left: 240px;
+    padding: 30px;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    background-color: white;
+    padding: 10px 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  }
+  .settings-box {
+    background-color: #0b0a3e;
+    border-radius: 20px;
+    padding: 30px;
+    color: white;
+    max-width: 600px;
+    margin: auto;
+  }
+  .settings-box .btn {
+    background-color: white;
+    color: black;
+    margin-bottom: 10px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .settings-box .btn i {
+    margin-right: 10px;
+  }
+  
