@@ -39,6 +39,9 @@ class UserController extends Controller
 
 
     // GET /api/users/{id}
+
+
+    
 public function show($id)
 {
     $user = User::with(['roles', 'teacher.user', 'teacher.subjects', 'teacher.classrooms'])->findOrFail($id);
